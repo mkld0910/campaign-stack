@@ -1,0 +1,26 @@
+# Environment variables (NEVER commit)
+.env
+.env.local
+.env.*.local
+CREDENTIALS_BACKUP.txt
+
+# Docker volumes (local data)
+/backups/
+/wordpress_data/
+/mysql_data/
+/postgres_data/
+/redis_data/
+/n8n_data/
+/erpnext_data/
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+
+# Logs
+*.log
+
