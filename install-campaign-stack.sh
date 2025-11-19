@@ -44,23 +44,40 @@ echo "Deploy WordPress + CiviCRM + Traefik + Backups"
 echo "Estimated time: 15-30 minutes"
 echo ""
 
-# Prerequisites Check
-print_header "Step 1/6: Checking Prerequisites"
+# Prerequisites Check & Installation
+print_header "Step 1/6: Checking & Installing Prerequisites"
 
+# Check and install Docker
 if ! command -v docker &> /dev/null; then
-    print_error "Docker not found. Install Docker first:"
-    echo "  curl -sSL https://get.docker.com | sh"
-    exit 1
+    print_info "Docker not found. Installing Docker..."
+    curl -sSL https://get.docker.com | sh
+    print_success "Docker installed"
+else
+    print_success "Docker already installed"
 fi
-print_success "Docker installed"
 
+# Check and install Docker Compose
 if ! command -v docker-compose &> /dev/null; then
-    print_error "Docker Compose not found. Install first:"
-    echo "  curl -L 'https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)' -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose"
+    print_info "Docker Compose not found. Installing Docker Compose..."
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    print_success "Docker Compose installed"
+else
+    print_success "Docker Compose already installed"
+fi
+
+# Verify both work
+if ! docker --version &> /dev/null; then
+    print_error "Docker installation failed"
     exit 1
 fi
-print_success "Docker Compose installed"
 
+if ! docker-compose --version &> /dev/null; then
+    print_error "Docker Compose installation failed"
+    exit 1
+fi
+
+# Optional: Uplink CLI for backups
 if ! command -v uplink &> /dev/null; then
     print_warning "Uplink CLI not found. Backups to Storj will not work until installed."
     print_info "Install after deployment: See docs/BACKUP.md"
