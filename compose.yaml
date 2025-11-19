@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   traefik:
@@ -43,6 +42,7 @@ services:
   wordpress_mysql:
     image: mysql:8.0
     container_name: wordpress_mysql
+    command: --default-authentication-plugin=mysql_native_password --log_bin_trust_function_creators=ON
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER}
@@ -60,6 +60,7 @@ services:
       retries: 5
 
   wordpress_app:
+    image: wordpress:latest
     container_name: wordpress_app
     build:
       context: .

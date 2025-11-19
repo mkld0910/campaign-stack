@@ -26,3 +26,6 @@ Thumbs.db
 
 .env.secret
 .env.wordpress
+.env
+.env.local
+CREDENTIALS_BACKUP.txt

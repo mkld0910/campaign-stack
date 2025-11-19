@@ -95,7 +95,7 @@ echo "---"
 echo ""
 
 # Get domain from .env
-DOMAIN=$(grep CAMPAIGN_DOMAIN .env | cut -d '=' -f2)
+DOMAIN=$(grep ^DOMAIN .env | cut -d '=' -f2)
 
 echo "Step 9: Installing CiviCRM via CLI (bypasses web installer)..."
 echo "This may take 1-2 minutes..."
