@@ -4,107 +4,94 @@ services:
   traefik:
     image: traefik:v3.6.1
     container_name: traefik
-    restart: unless-stopped
-    environment:
-      - TZ=UTC
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik_data/acme.json"
     ports:
       - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_data:/etc/traefik
+      - traefik_data:/traefik_data
     networks:
       - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.traefik.service=api@internal"
+    restart: unless-stopped
 
   portainer:
     image: portainer/portainer-ce:2.35.0-alpine
     container_name: portainer
-    restart: unless-stopped
-    environment:
-      - TZ=UTC
+    command: -H unix:///var/run/docker.sock
     ports:
+      - "8000:8000"
       - "9000:9000"
       - "9443:9443"
-      - "8000:8000"
     volumes:
-      - /run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     networks:
       - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.cwv.it.com`)"
-      - "traefik.http.routers.portainer.entrypoints=web"
-      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    restart: unless-stopped
 
-  mysql:
+  wordpress_mysql:
     image: mysql:8.0
     container_name: wordpress_mysql
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --log_bin_trust_function_creators=ON
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - traefik
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  wordpress:
+  wordpress_app:
     image: wordpress:latest
     container_name: wordpress_app
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
+    build:
+      context: .
+      dockerfile: Dockerfile.wordpress
     environment:
-      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_HOST: wordpress_mysql
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
-      WORDPRESS_TABLE_PREFIX: wp_
-      WORDPRESS_DEBUG: false
     volumes:
       - wordpress_data:/var/www/html
     networks:
       - traefik
+    restart: unless-stopped
+    depends_on:
+      wordpress_mysql:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wordpress.rule=Host(`cwv.it.com`)"
-      - "traefik.http.routers.wordpress.entrypoints=web"
+      - "traefik.http.routers.wordpress.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.wordpress.entrypoints=web,websecure"
+      - "traefik.http.routers.wordpress.tls.certresolver=letsencrypt"
       - "traefik.http.services.wordpress.loadbalancer.server.port=80"
-      # ### TODO: Enable TLS/HTTPS after initial deployment
-      # - "traefik.http.routers.wordpress-secure.rule=Host(`cwv.it.com`)"
-      # - "traefik.http.routers.wordpress-secure.entrypoints=websecure"
-      # - "traefik.http.routers.wordpress-secure.tls=true"
-      # - "traefik.http.routers.wordpress-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.wordpress.middlewares=redirect-to-https@docker"
 
 volumes:
   traefik_data:
-    driver: local
   portainer_data:
-    driver: local
   mysql_data:
-    driver: local
   wordpress_data:
-    driver: local
 
 networks:
   traefik:

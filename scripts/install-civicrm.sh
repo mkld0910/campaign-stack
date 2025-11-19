@@ -55,7 +55,7 @@ if ! docker-compose ps | grep -q "wordpress_app"; then
 fi
 print_success "WordPress container is running"
 
-# Check if WordPress database is initialized (simpler check)
+# Check if WordPress database is initialized
 print_info "Checking WordPress database..."
 MYSQL_ROOT_PASS=$(grep MYSQL_ROOT_PASSWORD "$REPO_DIR/.env" | cut -d'=' -f2)
 
@@ -71,14 +71,14 @@ print_info "Fetching latest stable CiviCRM version..."
 CIVICRM_VERSION=$(curl -s -m 5 https://civicrm.org/download 2>/dev/null | grep -oP '(?<=civicrm-)[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
 
 if [ -z "$CIVICRM_VERSION" ]; then
-    print_warning "Could not auto-detect version, using 5.76.0 (latest known stable)"
-    CIVICRM_VERSION="5.76.0"
+    print_warning "Could not auto-detect version, using 6.8.0 (latest known stable)"
+    CIVICRM_VERSION="6.8.0"
 fi
 
 print_success "Using CiviCRM version: $CIVICRM_VERSION"
 
 # Download CiviCRM
-DOWNLOAD_URL="https://civicrm.org/sites/civicrm.org/files/civicrm-$CIVICRM_VERSION-wordpress.zip"
+DOWNLOAD_URL="https://download.civicrm.org/civicrm-$CIVICRM_VERSION-wordpress.zip"
 TEMP_ZIP="/tmp/civicrm-$CIVICRM_VERSION-wordpress.zip"
 
 print_info "Downloading CiviCRM $CIVICRM_VERSION..."
@@ -91,19 +91,22 @@ fi
 FILE_SIZE=$(du -h "$TEMP_ZIP" | cut -f1)
 print_success "Downloaded: $FILE_SIZE"
 
-# Copy to WordPress container plugins directory
-print_info "Installing to WordPress container..."
-
 # Remove old CiviCRM if exists
+print_info "Preparing WordPress container..."
 docker exec wordpress_app rm -rf /var/www/html/wp-content/plugins/civicrm 2>/dev/null || true
 
-# Extract directly in container
+# Copy zip file INTO the container
+print_info "Copying CiviCRM to container..."
+docker cp "$TEMP_ZIP" wordpress_app:/tmp/civicrm.zip
+
+# Extract inside the container
 print_info "Extracting files..."
 docker exec wordpress_app bash -c "
     cd /tmp && \
-    unzip -q $TEMP_ZIP && \
+    unzip -q civicrm.zip && \
     mv civicrm /var/www/html/wp-content/plugins/ && \
-    chown -R www-data:www-data /var/www/html/wp-content/plugins/civicrm
+    chown -R www-data:www-data /var/www/html/wp-content/plugins/civicrm && \
+    rm civicrm.zip
 " || {
     print_error "Failed to extract CiviCRM in container"
     exit 1
@@ -129,13 +132,13 @@ print_header "Installation Complete!"
 echo "Next steps:"
 echo "  1. Wait 1-2 minutes for WordPress to restart"
 echo "  2. Visit WordPress Admin: https://yourdomain.com/wp-admin"
-echo "  3. Go to Plugins - you should see CiviCRM"
+echo "  3. Go to Plugins - you should see CiviCRM listed"
 echo "  4. Click Activate on CiviCRM"
 echo "  5. Click CiviCRM in left sidebar"
 echo "  6. Complete CiviCRM setup wizard"
 echo ""
 
-print_success "CiviCRM $CIVICRM_VERSION ready!"
+print_success "CiviCRM $CIVICRM_VERSION installed and ready!"
 
 # Cleanup
 rm -f "$TEMP_ZIP"
