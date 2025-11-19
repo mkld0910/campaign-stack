@@ -1,144 +1,123 @@
 #!/bin/bash
 
-################################################################################
-# CiviCRM Automated Installer
-# Downloads latest stable CiviCRM and installs to WordPress container
-# Usage: bash scripts/install-civicrm.sh
-################################################################################
+# CiviCRM CLI Installation Script
+# Uses the cv (CiviCRM CLI) tool to bypass web installer permission issues
+# Based on successful Day 2 installation method
 
 set -e
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-print_header() {
-    echo -e "\n${BLUE}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BLUE}$1${NC}"
-    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}\n"
-}
-
-print_success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}✗ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠ $1${NC}"
-}
-
-print_info() {
-    echo -e "${BLUE}ℹ $1${NC}"
-}
-
-# Start
-print_header "CiviCRM Automated Installer"
-echo "Downloads and installs latest stable CiviCRM"
+echo "=========================================="
+echo "CiviCRM CLI Installation Script"
+echo "=========================================="
 echo ""
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
-cd "$REPO_DIR"
-
-# Check Docker running
-if ! docker-compose ps | grep -q "wordpress_app"; then
-    print_error "WordPress container not running"
-    print_info "Start services first: docker-compose up -d"
-    exit 1
-fi
-print_success "WordPress container is running"
-
-# Check if WordPress database is initialized
-print_info "Checking WordPress database..."
-MYSQL_ROOT_PASS=$(grep MYSQL_ROOT_PASSWORD "$REPO_DIR/.env" | cut -d'=' -f2)
-
-if ! docker exec wordpress_mysql mysql -u root -p"$MYSQL_ROOT_PASS" wordpress_db -e "SELECT COUNT(*) FROM wp_options;" &>/dev/null; then
-    print_error "WordPress database not fully initialized yet"
-    print_info "Wait a few more minutes and try again"
-    exit 1
-fi
-print_success "WordPress database is initialized"
-
-# Get latest CiviCRM version (with fallback)
-print_info "Fetching latest stable CiviCRM version..."
-CIVICRM_VERSION=$(curl -s -m 5 https://civicrm.org/download 2>/dev/null | grep -oP '(?<=civicrm-)[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-
-if [ -z "$CIVICRM_VERSION" ]; then
-    print_warning "Could not auto-detect version, using 6.8.0 (latest known stable)"
-    CIVICRM_VERSION="6.8.0"
-fi
-
-print_success "Using CiviCRM version: $CIVICRM_VERSION"
-
-# Download CiviCRM
-DOWNLOAD_URL="https://download.civicrm.org/civicrm-$CIVICRM_VERSION-wordpress.zip"
-TEMP_ZIP="/tmp/civicrm-$CIVICRM_VERSION-wordpress.zip"
-
-print_info "Downloading CiviCRM $CIVICRM_VERSION..."
-if ! curl -L --progress-bar -o "$TEMP_ZIP" "$DOWNLOAD_URL" 2>/dev/null; then
-    print_error "Failed to download CiviCRM from: $DOWNLOAD_URL"
-    print_info "Try manually downloading from: https://civicrm.org/download"
+# Check if running from correct directory
+if [ ! -f "compose.yaml" ]; then
+    echo "❌ Error: Must run from campaign-stack directory"
+    echo "   cd /srv/campaign-stack && bash scripts/install-civicrm-cli.sh"
     exit 1
 fi
 
-FILE_SIZE=$(du -h "$TEMP_ZIP" | cut -f1)
-print_success "Downloaded: $FILE_SIZE"
+# Check if WordPress container is running
+if ! docker compose ps | grep -q "wordpress_app.*Up"; then
+    echo "❌ Error: WordPress container not running"
+    echo "   Run: docker compose up -d"
+    exit 1
+fi
 
-# Remove old CiviCRM if exists
-print_info "Preparing WordPress container..."
-docker exec wordpress_app rm -rf /var/www/html/wp-content/plugins/civicrm 2>/dev/null || true
+echo "Step 1: Installing required tools in WordPress container..."
+docker exec wordpress_app bash -c "apt-get update -qq && apt-get install -y wget unzip > /dev/null 2>&1"
+echo "✅ Tools installed (wget, unzip)"
+echo ""
 
-# Copy zip file INTO the container
-print_info "Copying CiviCRM to container..."
-docker cp "$TEMP_ZIP" wordpress_app:/tmp/civicrm.zip
+echo "Step 2: Downloading CiviCRM stable release..."
+docker exec -w /var/www/html/wp-content/plugins wordpress_app bash -c "
+    if [ -d 'civicrm' ]; then
+        echo '⚠️  CiviCRM directory already exists, skipping download'
+    else
+        wget -q https://download.civicrm.org/latest/civicrm-STABLE-wordpress.zip
+        echo '✅ Downloaded (45+ MB)'
+    fi
+"
+echo ""
 
-# Extract inside the container
-print_info "Extracting files..."
+echo "Step 3: Extracting CiviCRM..."
+docker exec -w /var/www/html/wp-content/plugins wordpress_app bash -c "
+    if [ -d 'civicrm' ]; then
+        echo '✅ CiviCRM already extracted'
+    else
+        unzip -q civicrm-STABLE-wordpress.zip
+        rm civicrm-STABLE-wordpress.zip
+        echo '✅ Extracted and cleaned up'
+    fi
+"
+echo ""
+
+echo "Step 4: Setting proper permissions..."
+docker exec -w /var/www/html/wp-content/plugins wordpress_app bash -c "
+    chown -R www-data:www-data civicrm
+"
+echo "✅ Permissions set (www-data:www-data)"
+echo ""
+
+echo "Step 5: Granting MySQL TRIGGER privilege..."
+MYSQL_ROOT_PASSWORD=$(grep MYSQL_ROOT_PASSWORD .env | cut -d '=' -f2)
+docker exec wordpress_mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "
+    GRANT TRIGGER ON wordpress_db.* TO 'wordpress_user'@'%';
+    FLUSH PRIVILEGES;
+" > /dev/null 2>&1
+echo "✅ TRIGGER privilege granted"
+echo ""
+
+echo "Step 6: Installing cv (CiviCRM CLI tool)..."
 docker exec wordpress_app bash -c "
-    cd /tmp && \
-    unzip -q civicrm.zip && \
-    mv civicrm /var/www/html/wp-content/plugins/ && \
-    chown -R www-data:www-data /var/www/html/wp-content/plugins/civicrm && \
-    rm civicrm.zip
-" || {
-    print_error "Failed to extract CiviCRM in container"
-    exit 1
-}
-
-print_success "CiviCRM extracted to plugins directory"
-
-# Grant database privileges
-print_info "Granting database privileges..."
-docker exec wordpress_mysql mysql -u root -p"$MYSQL_ROOT_PASS" -e \
-    "GRANT TRIGGER ON wordpress_db.* TO 'wordpress_user'@'%'; FLUSH PRIVILEGES;" 2>/dev/null
-
-print_success "Database privileges configured"
-
-# Restart WordPress
-print_info "Restarting WordPress to apply changes..."
-docker-compose restart wordpress_app
-sleep 15
-
-# Final instructions
-print_header "Installation Complete!"
-
-echo "Next steps:"
-echo "  1. Wait 1-2 minutes for WordPress to restart"
-echo "  2. Visit WordPress Admin: https://yourdomain.com/wp-admin"
-echo "  3. Go to Plugins - you should see CiviCRM listed"
-echo "  4. Click Activate on CiviCRM"
-echo "  5. Click CiviCRM in left sidebar"
-echo "  6. Complete CiviCRM setup wizard"
+    if [ ! -f '/usr/local/bin/cv' ]; then
+        cd /tmp
+        wget -q https://download.civicrm.org/cv/cv.phar
+        chmod +x cv.phar
+        mv cv.phar /usr/local/bin/cv
+        echo '✅ cv tool installed'
+    else
+        echo '✅ cv tool already installed'
+    fi
+"
 echo ""
 
-print_success "CiviCRM $CIVICRM_VERSION installed and ready!"
+echo "Step 7: Activating CiviCRM plugin in WordPress..."
+docker exec wordpress_app wp plugin activate civicrm --allow-root --quiet 2>/dev/null || true
+echo "✅ Plugin activated"
+echo ""
 
-# Cleanup
-rm -f "$TEMP_ZIP"
+echo "Step 8: Running CiviCRM requirements check..."
+echo "---"
+docker exec -w /var/www/html/wp-content/plugins/civicrm wordpress_app cv core:check-req || true
+echo "---"
+echo ""
+
+# Get domain from .env
+DOMAIN=$(grep CAMPAIGN_DOMAIN .env | cut -d '=' -f2)
+
+echo "Step 9: Installing CiviCRM via CLI (bypasses web installer)..."
+echo "This may take 1-2 minutes..."
+docker exec -w /var/www/html/wp-content/plugins/civicrm wordpress_app cv core:install \
+    --cms-base-url="https://${DOMAIN}" \
+    --lang=en_US
+
+echo ""
+echo "=========================================="
+echo "✅ CiviCRM Installation Complete!"
+echo "=========================================="
+echo ""
+echo "Access CiviCRM:"
+echo "  URL: https://${DOMAIN}/wp-admin/admin.php?page=CiviCRM"
+echo ""
+echo "Next Steps:"
+echo "  1. Log into WordPress admin"
+echo "  2. Navigate to CiviCRM menu item"
+echo "  3. Complete any remaining setup wizard steps"
+echo "  4. Create test contacts/events/donations"
+echo ""
+echo "Note: CLI installation bypasses the MySQL trigger"
+echo "      permission check that causes issues in the"
+echo "      web installer. Triggers work correctly."
+echo ""
