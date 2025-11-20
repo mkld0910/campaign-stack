@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ============================================================================
+  # Traefik: Reverse proxy with automatic HTTPS via Let's Encrypt
+  # ============================================================================
   traefik:
     image: traefik:v3.6.1
     container_name: traefik
@@ -25,6 +28,10 @@ services:
       - traefik
     restart: unless-stopped
 
+
+  # ============================================================================
+  # Portainer: Docker container management UI
+  # ============================================================================
   portainer:
     image: portainer/portainer-ce:2.35.0-alpine
     container_name: portainer
@@ -40,16 +47,31 @@ services:
       - traefik
     restart: unless-stopped
     labels:
+      # Enable Traefik routing
       - "traefik.enable=true"
+      
+      # Route on backend domain only
       - "traefik.http.routers.portainer.rule=Host(`portainer.${BACKEND_DOMAIN}`)"
+      
+      # Use HTTPS entrypoint
       - "traefik.http.routers.portainer.entrypoints=websecure"
+      
+      # Attach Let's Encrypt certificate resolver
       - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      
+      # Direct traffic to Portainer's web port
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
+
+  # ============================================================================
+  # MySQL: Database for WordPress and CiviCRM
+  # ============================================================================
   wordpress_mysql:
     image: mysql:8.0
     container_name: wordpress_mysql
-    command: --default-authentication-plugin=mysql_native_password --log_bin_trust_function_creators=ON
+    command: 
+      - --default-authentication-plugin=mysql_native_password
+      - --log_bin_trust_function_creators=ON
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER}
@@ -66,6 +88,10 @@ services:
       timeout: 5s
       retries: 5
 
+
+  # ============================================================================
+  # WordPress + CiviCRM: Campaign management and constituent database
+  # ============================================================================
   wordpress_app:
     image: wordpress:latest
     container_name: wordpress_app
@@ -73,13 +99,15 @@ services:
       context: .
       dockerfile: Dockerfile.wordpress
     environment:
+      # Database connection
       WORDPRESS_DB_HOST: wordpress_mysql
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
-      # Dual-domain WordPress configuration
-      # WP_HOME: What users see (public domain)
-      # WP_SITEURL: Where WordPress files are (backend domain)
+      
+      # Dual-domain configuration
+      # WP_HOME: What visitors see in the browser (public domain)
+      # WP_SITEURL: Where WordPress files are located (backend domain)
       WP_HOME: https://${PUBLIC_DOMAIN}
       WP_SITEURL: https://${BACKEND_DOMAIN}
       WORDPRESS_DOMAIN_CURRENT_SITE: ${BACKEND_DOMAIN}
@@ -92,20 +120,49 @@ services:
       wordpress_mysql:
         condition: service_healthy
     labels:
+      # Enable Traefik routing
       - "traefik.enable=true"
+      
+      # Route both public and backend domains to same container
       - "traefik.http.routers.wordpress.rule=Host(`${PUBLIC_DOMAIN}`) || Host(`${BACKEND_DOMAIN}`)"
+      
+      # Accept both HTTP and HTTPS traffic (will redirect HTTP to HTTPS)
       - "traefik.http.routers.wordpress.entrypoints=web,websecure"
+      
+      # Enable TLS/HTTPS
+      - "traefik.http.routers.wordpress.tls=true"
+      
+      # Use Let's Encrypt for certificate generation on BOTH domains
       - "traefik.http.routers.wordpress.tls.certresolver=letsencrypt"
+      
+      # Route traffic to WordPress port
       - "traefik.http.services.wordpress.loadbalancer.server.port=80"
+      
+      # Redirect all HTTP traffic to HTTPS
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.wordpress.middlewares=redirect-to-https@docker"
 
+
+# ================================================================================
+# Volumes: Persistent data storage
+# ================================================================================
 volumes:
+  # Traefik configuration and Let's Encrypt certificates
   traefik_data:
+  
+  # Portainer data and container info
   portainer_data:
+  
+  # MySQL database
   mysql_data:
+  
+  # WordPress files, themes, plugins, uploads
   wordpress_data:
 
+
+# ================================================================================
+# Networks: Internal Docker communication
+# ================================================================================
 networks:
   traefik:
     driver: bridge
