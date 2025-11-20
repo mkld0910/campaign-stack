@@ -1,98 +1,238 @@
+#!/bin/bash
 
-services:
-  traefik:
-    image: traefik:v3.6.1
-    container_name: traefik
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/traefik_data/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_data:/traefik_data
-    networks:
-      - traefik
-    restart: unless-stopped
+################################################################################
+# Campaign Stack - Initial Setup Script
+# Version: 2.0
+# Purpose: Configure dual-domain WordPress setup (public/backend separation)
+# Usage: bash scripts/setup.sh
+################################################################################
 
-  portainer:
-    image: portainer/portainer-ce:2.35.0-alpine
-    container_name: portainer
-    command: -H unix:///var/run/docker.sock
-    ports:
-      - "8000:8000"
-      - "9000:9000"
-      - "9443:9443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-    networks:
-      - traefik
-    restart: unless-stopped
+set -e
 
-  wordpress_mysql:
-    image: mysql:8.0
-    container_name: wordpress_mysql
-    command: --default-authentication-plugin=mysql_native_password --log_bin_trust_function_creators=ON
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - traefik
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-  wordpress_app:
-    image: wordpress:latest
-    container_name: wordpress_app
-    build:
-      context: .
-      dockerfile: Dockerfile.wordpress
-    environment:
-      WORDPRESS_DB_HOST: wordpress_mysql
-      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
-      WORDPRESS_DB_USER: ${MYSQL_USER}
-      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - wordpress_data:/var/www/html
-    networks:
-      - traefik
-    restart: unless-stopped
-    depends_on:
-      wordpress_mysql:
-        condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wordpress.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.wordpress.entrypoints=web,websecure"
-      - "traefik.http.routers.wordpress.tls.certresolver=letsencrypt"
-      - "traefik.http.services.wordpress.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.routers.wordpress.middlewares=redirect-to-https@docker"
+print_header() {
+    echo -e "\n${BLUE}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}\n"
+}
 
-volumes:
-  traefik_data:
-  portainer_data:
-  mysql_data:
-  wordpress_data:
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
 
-networks:
-  traefik:
-    driver: bridge
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Main Setup
+print_header "Campaign Stack v2.0 - Initial Setup"
+echo "Configures WordPress with optional public/backend domain separation"
+echo "Estimated time: 2-3 minutes"
+echo ""
+
+# Check if .env already exists
+if [ -f ".env" ]; then
+    print_warning ".env file already exists"
+    read -p "Do you want to reconfigure? (y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Setup cancelled. Using existing .env"
+        exit 0
+    fi
+fi
+
+print_header "Step 1/5: Domain Configuration"
+echo "Configure how your campaign stack will be accessed:"
+echo ""
+echo "Option 1: Single Domain (both public and admin at same address)"
+echo "  Example: markleonardforcongress.com"
+echo ""
+echo "Option 2: Dual Domain (public frontend, separate backend admin)"
+echo "  Example: Public=markleonardforcongress.com, Backend=cwv.it.com"
+echo ""
+
+read -p "Use dual domain setup? (y/n): " -n 1 -r
+echo
+DUAL_DOMAIN=false
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    DUAL_DOMAIN=true
+    print_info "Dual domain mode enabled"
+else
+    print_info "Single domain mode enabled"
+fi
+
+echo ""
+
+if [ "$DUAL_DOMAIN" = true ]; then
+    read -p "Enter PUBLIC domain (what visitors see): " PUBLIC_DOMAIN
+    while [ -z "$PUBLIC_DOMAIN" ]; do
+        print_error "Public domain cannot be empty"
+        read -p "Enter PUBLIC domain: " PUBLIC_DOMAIN
+    done
+    
+    read -p "Enter BACKEND domain (admin/operations): " BACKEND_DOMAIN
+    while [ -z "$BACKEND_DOMAIN" ]; do
+        print_error "Backend domain cannot be empty"
+        read -p "Enter BACKEND domain: " BACKEND_DOMAIN
+    done
+    
+    print_success "Dual domain configured:"
+    echo "  Public:  ${PUBLIC_DOMAIN}"
+    echo "  Backend: ${BACKEND_DOMAIN}"
+else
+    read -p "Enter domain name: " DOMAIN
+    while [ -z "$DOMAIN" ]; do
+        print_error "Domain cannot be empty"
+        read -p "Enter domain name: " DOMAIN
+    done
+    
+    PUBLIC_DOMAIN=$DOMAIN
+    BACKEND_DOMAIN=$DOMAIN
+    print_success "Single domain configured: ${DOMAIN}"
+fi
+
+echo ""
+print_header "Step 2/5: Database Configuration"
+
+read -p "Enter MySQL root password: " -s MYSQL_ROOT_PASSWORD
+echo
+while [ -z "$MYSQL_ROOT_PASSWORD" ]; do
+    print_error "Root password cannot be empty"
+    read -p "Enter MySQL root password: " -s MYSQL_ROOT_PASSWORD
+    echo
+done
+print_success "MySQL root password set"
+
+read -p "Enter database name [wordpress_db]: " MYSQL_DATABASE
+MYSQL_DATABASE=${MYSQL_DATABASE:-wordpress_db}
+
+read -p "Enter database user [wordpress_user]: " MYSQL_USER
+MYSQL_USER=${MYSQL_USER:-wordpress_user}
+
+read -p "Enter database password: " -s MYSQL_PASSWORD
+echo
+while [ -z "$MYSQL_PASSWORD" ]; do
+    print_error "Database password cannot be empty"
+    read -p "Enter database password: " -s MYSQL_PASSWORD
+    echo
+done
+print_success "Database configuration set"
+
+echo ""
+print_header "Step 3/5: Security Configuration"
+
+read -p "Enter Let's Encrypt email (for SSL certificates): " LETSENCRYPT_EMAIL
+while [ -z "$LETSENCRYPT_EMAIL" ]; do
+    print_error "Email cannot be empty"
+    read -p "Enter Let's Encrypt email: " LETSENCRYPT_EMAIL
+done
+print_success "Let's Encrypt email configured"
+
+echo ""
+print_header "Step 4/5: WordPress Configuration"
+
+# Generate WordPress salts
+WP_AUTH_KEY=$(openssl rand -base64 32)
+WP_SECURE_AUTH_KEY=$(openssl rand -base64 32)
+WP_LOGGED_IN_KEY=$(openssl rand -base64 32)
+WP_NONCE_KEY=$(openssl rand -base64 32)
+WP_AUTH_SALT=$(openssl rand -base64 32)
+WP_SECURE_AUTH_SALT=$(openssl rand -base64 32)
+WP_LOGGED_IN_SALT=$(openssl rand -base64 32)
+WP_NONCE_SALT=$(openssl rand -base64 32)
+
+print_success "WordPress security keys generated"
+
+echo ""
+print_header "Step 5/5: Creating .env file"
+
+cat > .env << EOF
+# Campaign Stack Environment Configuration
+# Generated: $(date)
+
+# Domain Configuration
+PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
+BACKEND_DOMAIN=${BACKEND_DOMAIN}
+DUAL_DOMAIN_MODE=${DUAL_DOMAIN}
+
+# MySQL Configuration
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+MYSQL_DATABASE=${MYSQL_DATABASE}
+
+# SSL/TLS Configuration
+LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+
+# WordPress Security Keys (DO NOT SHARE)
+WP_AUTH_KEY=${WP_AUTH_KEY}
+WP_SECURE_AUTH_KEY=${WP_SECURE_AUTH_KEY}
+WP_LOGGED_IN_KEY=${WP_LOGGED_IN_KEY}
+WP_NONCE_KEY=${WP_NONCE_KEY}
+WP_AUTH_SALT=${WP_AUTH_SALT}
+WP_SECURE_AUTH_SALT=${WP_SECURE_AUTH_SALT}
+WP_LOGGED_IN_SALT=${WP_LOGGED_IN_SALT}
+WP_NONCE_SALT=${WP_NONCE_SALT}
+
+# Campaign Stack Configuration
+ENVIRONMENT=production
+DEBUG=false
+EOF
+
+print_success ".env file created"
+
+# Display summary
+print_header "Setup Complete!"
+
+echo -e "${GREEN}Configuration Summary:${NC}"
+echo ""
+if [ "$DUAL_DOMAIN" = true ]; then
+    echo "  Domain Mode:     Dual Domain (Public/Backend Separation)"
+    echo "  Public Domain:   ${PUBLIC_DOMAIN}"
+    echo "  Backend Domain:  ${BACKEND_DOMAIN}"
+else
+    echo "  Domain Mode:     Single Domain"
+    echo "  Domain:          ${PUBLIC_DOMAIN}"
+fi
+echo ""
+echo "  Database:        ${MYSQL_DATABASE}"
+echo "  Database User:   ${MYSQL_USER}"
+echo "  SSL Email:       ${LETSENCRYPT_EMAIL}"
+echo ""
+
+echo -e "${GREEN}Next Steps:${NC}"
+echo "  1. Review .env file: cat .env"
+echo "  2. Start containers: docker compose up -d"
+echo "  3. Wait for MySQL to be ready (~30 seconds)"
+echo "  4. Run installation: bash scripts/install-wordpress.sh"
+echo ""
+
+if [ "$DUAL_DOMAIN" = true ]; then
+    echo -e "${YELLOW}Dual Domain Setup Notes:${NC}"
+    echo "  - Visitors access public site at: https://${PUBLIC_DOMAIN}"
+    echo "  - WordPress admin accessible at: https://${BACKEND_DOMAIN}/wp-admin"
+    echo "  - Both domains serve the same WordPress instance"
+    echo "  - Configure Really Simple Security to whitelist both domains"
+    echo ""
+fi
+
+echo -e "${BLUE}Documentation:${NC}"
+echo "  - Setup Guide: docs/SETUP.md"
+echo "  - Troubleshooting: docs/TROUBLESHOOTING.md"
+echo ""
+
+print_success "Setup script completed!"

@@ -2,8 +2,8 @@
 
 ################################################################################
 # Campaign Stack - CiviCRM CLI Installation Script
-# Version: 1.0
-# Purpose: Install CiviCRM via CLI tool, fixing permissions issues
+# Version: 2.0
+# Purpose: Install CiviCRM via CLI tool with dual-domain support
 # Usage: bash scripts/install-civicrm.sh
 ################################################################################
 
@@ -39,8 +39,9 @@ print_info() {
 }
 
 # Main Installation
-print_header "CiviCRM CLI Installation Script v1.0"
+print_header "CiviCRM CLI Installation Script v2.0"
 echo "Uses cv tool to bypass web installer permission issues"
+echo "Supports dual-domain and single-domain configurations"
 echo "Estimated time: 3-5 minutes"
 echo ""
 
@@ -131,17 +132,39 @@ docker exec -w /var/www/html/wp-content/plugins/civicrm wordpress_app cv core:ch
 echo "---"
 print_success "Requirements check complete"
 
-# Get domain from .env
-DOMAIN=$(grep ^DOMAIN .env | cut -d '=' -f2)
+# Get domain from .env - supports both old (DOMAIN) and new (PUBLIC_DOMAIN/BACKEND_DOMAIN) formats
+print_header "Step 10/12: Detecting Domain Configuration"
 
-print_header "Step 10/12: Installing CiviCRM via CLI"
+# Check for new dual-domain format first
+PUBLIC_DOMAIN=$(grep ^PUBLIC_DOMAIN .env 2>/dev/null | cut -d '=' -f2 || echo "")
+BACKEND_DOMAIN=$(grep ^BACKEND_DOMAIN .env 2>/dev/null | cut -d '=' -f2 || echo "")
+
+# Fall back to old single DOMAIN format if not found
+if [ -z "$PUBLIC_DOMAIN" ] || [ -z "$BACKEND_DOMAIN" ]; then
+    DOMAIN=$(grep ^DOMAIN .env 2>/dev/null | cut -d '=' -f2 || echo "")
+    if [ -z "$DOMAIN" ]; then
+        print_error "No domain configuration found in .env"
+        echo "   Ensure .env contains either:"
+        echo "   - PUBLIC_DOMAIN and BACKEND_DOMAIN (new format), or"
+        echo "   - DOMAIN (legacy format)"
+        exit 1
+    fi
+    PUBLIC_DOMAIN=$DOMAIN
+    print_info "Using legacy single-domain format: $PUBLIC_DOMAIN"
+else
+    print_info "Using dual-domain format:"
+    print_info "  Public: $PUBLIC_DOMAIN"
+    print_info "  Backend: $BACKEND_DOMAIN"
+fi
+
+print_header "Step 11/12: Installing CiviCRM via CLI"
 print_info "This may take 1-2 minutes..."
 docker exec -w /var/www/html/wp-content/plugins/civicrm wordpress_app cv core:install \
-    --cms-base-url="https://${DOMAIN}" \
+    --cms-base-url="https://${PUBLIC_DOMAIN}" \
     --lang=en_US
 print_success "CiviCRM installation complete"
 
-print_header "Step 11/12: Post-Installation Permission Fixes"
+print_header "Step 12/12: Post-Installation Permission Fixes"
 docker exec wordpress_app bash -c "
     chown -R www-data:www-data /var/www/html/wp-content/uploads/civicrm
     find /var/www/html/wp-content/uploads/civicrm -type d -exec chmod 755 {} \;
@@ -149,7 +172,7 @@ docker exec wordpress_app bash -c "
 "
 print_success "Post-installation permissions secured"
 
-print_header "Step 12/12: Clearing CiviCRM Cache"
+print_header "Step 13/13: Clearing CiviCRM Cache"
 docker exec -w /var/www/html/wp-content/plugins/civicrm wordpress_app bash -c "
     cv cache:flush 2>/dev/null || true
 "
@@ -161,17 +184,25 @@ print_header "Setup Complete!"
 echo -e "${GREEN}CiviCRM is now installed and ready to use!${NC}"
 echo ""
 echo -e "${GREEN}Access CiviCRM:${NC}"
-echo "  https://${DOMAIN}/wp-admin/admin.php?page=CiviCRM"
+echo "  Backend admin: https://${BACKEND_DOMAIN:-$PUBLIC_DOMAIN}/wp-admin/admin.php?page=CiviCRM"
 echo ""
 echo -e "${GREEN}Next Steps:${NC}"
-echo "  1. Log into WordPress admin at https://${DOMAIN}/wp-admin"
+echo "  1. Log into WordPress admin at https://${BACKEND_DOMAIN:-$PUBLIC_DOMAIN}/wp-admin"
 echo "  2. Navigate to CiviCRM menu item in sidebar"
 echo "  3. Complete any remaining setup wizard steps"
 echo "  4. Create test contacts/events/donations"
 echo ""
+echo -e "${YELLOW}Really Simple Security Configuration:${NC}"
+echo "  Whitelist the following domains in Really Simple Security:"
+echo "  - ${PUBLIC_DOMAIN}"
+if [ ! -z "$BACKEND_DOMAIN" ] && [ "$BACKEND_DOMAIN" != "$PUBLIC_DOMAIN" ]; then
+    echo "  - ${BACKEND_DOMAIN}"
+fi
+echo ""
 echo -e "${BLUE}Documentation:${NC}"
 echo "  - Troubleshooting: docs/TROUBLESHOOTING.md"
 echo "  - CiviCRM Setup: docs/CIVICRM_SETUP.md"
+echo "  - Dual-Domain Setup: docs/DUAL_DOMAIN_SETUP.md"
 echo ""
 
 print_success "CiviCRM installation completed successfully!"
