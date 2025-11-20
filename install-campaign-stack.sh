@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 ################################################################################
@@ -85,10 +84,10 @@ print_header "Step 2/7: Domain Configuration"
 echo "Configure how your campaign stack will be accessed:"
 echo ""
 echo "Option 1: Single Domain (both public and admin at same address)"
-echo "  Example: markleonardforcongress.com"
+echo "  Example: example.com"
 echo ""
 echo "Option 2: Dual Domain (public frontend, separate backend admin)"
-echo "  Example: Public=markleonardforcongress.com, Backend=cwv.it.com"
+echo "  Example: Public=example.com, Backend=admin.example.com"
 echo ""
 
 read -p "Use dual domain setup? (y/n): " -n 1 -r
@@ -256,11 +255,11 @@ echo "Your campaign infrastructure is now live!"
 echo ""
 echo -e "${GREEN}Access Points:${NC}"
 if [ "$DUAL_DOMAIN" = true ]; then
-    echo "  Public Site: https://${PUBLIC_DOMAIN}"
-    echo "  WordPress Admin: https://${BACKEND_DOMAIN}/wp-admin"
+    echo "  Public Site: https://$PUBLIC_DOMAIN"
+    echo "  WordPress Admin: https://$BACKEND_DOMAIN/wp-admin"
 else
-    echo "  Website: https://${PUBLIC_DOMAIN}"
-    echo "  WordPress Admin: https://${PUBLIC_DOMAIN}/wp-admin"
+    echo "  Website: https://$PUBLIC_DOMAIN"
+    echo "  WordPress Admin: https://$PUBLIC_DOMAIN/wp-admin"
 fi
 echo ""
 echo -e "${GREEN}Next Steps:${NC}"
@@ -275,7 +274,7 @@ echo "  - Save credentials to password manager"
 echo "  - Delete CREDENTIALS_BACKUP.txt from server"
 echo "  - Never commit .env to git"
 if [ "$DUAL_DOMAIN" = true ]; then
-    echo "  - Whitelist both ${PUBLIC_DOMAIN} and ${BACKEND_DOMAIN} in security plugins"
+    echo "  - Whitelist both $PUBLIC_DOMAIN and $BACKEND_DOMAIN in security plugins"
 fi
 echo ""
 echo -e "${BLUE}Documentation:${NC}"
