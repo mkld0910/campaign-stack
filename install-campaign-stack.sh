@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 ################################################################################
@@ -56,24 +57,18 @@ else
     print_success "Docker already installed"
 fi
 
-# Check and install Docker Compose
-if ! command -v docker-compose &> /dev/null; then
-    print_info "Docker Compose not found. Installing Docker Compose..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    print_success "Docker Compose installed"
+# Check for Docker Compose (V2 is included with modern Docker)
+if ! docker compose version &> /dev/null; then
+    print_error "Docker Compose V2 not found"
+    print_info "Ensure you have Docker Desktop or Docker Engine with Compose plugin"
+    exit 1
 else
     print_success "Docker Compose already installed"
 fi
 
-# Verify both work
+# Verify Docker works
 if ! docker --version &> /dev/null; then
     print_error "Docker installation failed"
-    exit 1
-fi
-
-if ! docker-compose --version &> /dev/null; then
-    print_error "Docker Compose installation failed"
     exit 1
 fi
 
@@ -223,10 +218,10 @@ print_header "Step 5/7: Deploying Services"
 cd "$SCRIPT_DIR"
 
 print_info "Pulling Docker images..."
-docker-compose pull
+docker compose pull
 
 print_info "Starting services..."
-docker-compose up -d
+docker compose up -d
 
 print_info "Waiting for services to initialize..."
 sleep 30
@@ -234,17 +229,17 @@ sleep 30
 # Verify Deployment
 print_header "Step 6/7: Verifying Deployment"
 
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     print_success "Docker services running"
 else
     print_error "Some services failed to start"
-    docker-compose logs
+    docker compose logs
     exit 1
 fi
 
 # Count running services
-RUNNING=$(docker-compose ps | grep -c "Up" || true)
-TOTAL=$(docker-compose config --services | wc -l)
+RUNNING=$(docker compose ps | grep -c "Up" || true)
+TOTAL=$(docker compose config --services | wc -l)
 
 if [ "$RUNNING" -ge "$TOTAL" ]; then
     print_success "WordPress container running"
