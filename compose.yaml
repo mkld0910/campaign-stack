@@ -1,8 +1,13 @@
 version: '3.8'
 
+# Campaign Stack - Complete Docker Configuration (v2.3)
+# Deploys: Traefik, WordPress, MySQL, Portainer, AI Provider, Wiki.js
+# All services containerized with persistent storage for documentation
+
 services:
+
   # ============================================================================
-  # Traefik: Reverse proxy with automatic HTTPS via Let's Encrypt
+  # TRAEFIK: Reverse proxy + automatic HTTPS via Let's Encrypt
   # ============================================================================
   traefik:
     image: traefik:v3.6.1
@@ -18,9 +23,9 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/traefik_data/acme.json"
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "8080:8080"  # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_data:/traefik_data
@@ -30,7 +35,7 @@ services:
 
 
   # ============================================================================
-  # Portainer: Docker container management UI
+  # PORTAINER: Docker container management UI
   # ============================================================================
   portainer:
     image: portainer/portainer-ce:2.35.0-alpine
@@ -46,30 +51,15 @@ services:
     networks:
       - traefik
     restart: unless-stopped
-    labels:
-      # Enable Traefik routing
-      - "traefik.enable=true"
-      
-      # Route on backend domain only
-      - "traefik.http.routers.portainer.rule=Host(`portainer.${BACKEND_DOMAIN}`)"
-      
-      # Use HTTPS entrypoint
-      - "traefik.http.routers.portainer.entrypoints=websecure"
-      
-      # Attach Let's Encrypt certificate resolver
-      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
-      
-      # Direct traffic to Portainer's web port
-      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
 
   # ============================================================================
-  # MySQL: Database for WordPress and CiviCRM
+  # MYSQL: Database for WordPress and CiviCRM
   # ============================================================================
   wordpress_mysql:
     image: mysql:8.0
     container_name: wordpress_mysql
-    command: 
+    command:
       - --default-authentication-plugin=mysql_native_password
       - --log_bin_trust_function_creators=ON
     environment:
@@ -90,7 +80,7 @@ services:
 
 
   # ============================================================================
-  # WordPress + CiviCRM: Campaign management and constituent database
+  # WORDPRESS: Web server + WordPress + CiviCRM
   # ============================================================================
   wordpress_app:
     image: wordpress:latest
@@ -106,11 +96,9 @@ services:
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       
       # Dual-domain configuration
-      # WP_HOME: What visitors see in the browser (public domain)
-      # WP_SITEURL: Where WordPress files are located (backend domain)
-      WP_HOME: https://${PUBLIC_DOMAIN}
-      WP_SITEURL: https://${BACKEND_DOMAIN}
-      WORDPRESS_DOMAIN_CURRENT_SITE: ${BACKEND_DOMAIN}
+      WP_HOME: https://${PUBLIC_DOMAIN:-DOMAIN}
+      WP_SITEURL: https://${BACKEND_DOMAIN:-DOMAIN}
+      
     volumes:
       - wordpress_data:/var/www/html
     networks:
@@ -123,45 +111,166 @@ services:
       # Enable Traefik routing
       - "traefik.enable=true"
       
-      # Route both public and backend domains to same container
-      - "traefik.http.routers.wordpress.rule=Host(`${PUBLIC_DOMAIN}`) || Host(`${BACKEND_DOMAIN}`)"
+      # Route public and backend domains
+      - "traefik.http.routers.wordpress.rule=Host(`${PUBLIC_DOMAIN:-DOMAIN}`) || Host(`${BACKEND_DOMAIN:-DOMAIN}`)"
       
-      # Accept both HTTP and HTTPS traffic (will redirect HTTP to HTTPS)
+      # Accept HTTP and HTTPS
       - "traefik.http.routers.wordpress.entrypoints=web,websecure"
       
       # Enable TLS/HTTPS
       - "traefik.http.routers.wordpress.tls=true"
       
-      # Use Let's Encrypt for certificate generation on BOTH domains
+      # Use Let's Encrypt for certificates
       - "traefik.http.routers.wordpress.tls.certresolver=letsencrypt"
       
       # Route traffic to WordPress port
       - "traefik.http.services.wordpress.loadbalancer.server.port=80"
       
-      # Redirect all HTTP traffic to HTTPS
+      # Redirect HTTP to HTTPS
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.wordpress.middlewares=redirect-to-https@docker"
 
 
+  # ============================================================================
+  # WIKI.JS: Knowledge management system for AI-generated documentation
+  # ============================================================================
+  wiki_db:
+    image: postgres:15-alpine
+    container_name: wiki_db
+    environment:
+      POSTGRES_DB: wiki
+      POSTGRES_USER: wiki
+      POSTGRES_PASSWORD: ${WIKI_DB_PASSWORD:-wikisecure123}
+    volumes:
+      - wiki_db_data:/var/lib/postgresql/data
+    networks:
+      - traefik
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wiki"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wiki:
+    image: requarks/wiki:latest
+    container_name: wiki
+    depends_on:
+      wiki_db:
+        condition: service_healthy
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: wiki_db
+      DB_PORT: 5432
+      DB_USER: wiki
+      DB_PASS: ${WIKI_DB_PASSWORD:-wikisecure123}
+      DB_NAME: wiki
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+    volumes:
+      - wiki_data:/data
+      - docs_volume:/wiki/docs_mount  # Mount docs here for Wiki to access
+    networks:
+      - traefik
+    restart: unless-stopped
+    labels:
+      # Enable Traefik routing
+      - "traefik.enable=true"
+      
+      # Route to wiki subdomain
+      - "traefik.http.routers.wiki.rule=Host(`wiki.${DOMAIN:-yourdomain.com}`)"
+      
+      # Accept HTTP and HTTPS
+      - "traefik.http.routers.wiki.entrypoints=web,websecure"
+      
+      # Enable TLS/HTTPS
+      - "traefik.http.routers.wiki.tls=true"
+      
+      # Use Let's Encrypt
+      - "traefik.http.routers.wiki.tls.certresolver=letsencrypt"
+      
+      # Route to Wiki.js port
+      - "traefik.http.services.wiki.loadbalancer.server.port=3000"
+      
+      # Redirect HTTP to HTTPS
+      - "traefik.http.middlewares.wiki-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.wiki.middlewares=wiki-https@docker"
+
+
+  # ============================================================================
+  # AI PROVIDER: Containerized Claude Code, OpenAI ChatGPT, Google Gemini, etc
+  # ============================================================================
+  ai_provider:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-provider
+    container_name: ai_provider
+    environment:
+      # Primary AI provider (anthropic, openai, google, ollama, or none)
+      PRIMARY_AI_PROVIDER: ${PRIMARY_AI_PROVIDER:-anthropic}
+      
+      # API keys for each provider
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    
+    volumes:
+      # Mount docs volume so AI can write documentation
+      - docs_volume:/app/docs
+      
+      # Mount WordPress code for reference
+      - wordpress_data:/app/workspace/wordpress:ro
+      
+      # Mount .env for configuration
+      - ./.env:/app/.env:ro
+    
+    networks:
+      - traefik
+    
+    # Run in interactive mode for terminal access
+    stdin_open: true
+    tty: true
+    
+    # Keep container running even if no terminal attached
+    restart: unless-stopped
+    
+    # Override default entrypoint for easier access
+    command: /app/start-ai.sh
+
+
 # ================================================================================
-# Volumes: Persistent data storage
+# VOLUMES: Persistent data storage
 # ================================================================================
 volumes:
   # Traefik configuration and Let's Encrypt certificates
   traefik_data:
   
-  # Portainer data and container info
+  # Portainer container management data
   portainer_data:
   
-  # MySQL database
+  # MySQL database files
   mysql_data:
   
   # WordPress files, themes, plugins, uploads
   wordpress_data:
+  
+  # Wiki.js database
+  wiki_db_data:
+  
+  # Wiki.js application data
+  wiki_data:
+  
+  # AI-generated documentation (shared between AI container and Wiki.js)
+  docs_volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/campaign-stack/docs
 
 
 # ================================================================================
-# Networks: Internal Docker communication
+# NETWORKS: Internal Docker communication
 # ================================================================================
 networks:
   traefik:
