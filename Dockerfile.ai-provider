@@ -1,0 +1,100 @@
+# Dockerfile.ai-provider
+# Containerized AI Provider (Claude, OpenAI, Google, or Ollama)
+# All in one container with access to docs volume
+
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    vim \
+    nano \
+    python3 \
+    py3-pip
+
+# Create working directory
+WORKDIR /app
+
+# Copy environment file (will be mounted)
+ENV PATH="/app/node_modules/.bin:$PATH"
+
+# Install all AI provider CLIs
+# Users can choose which one to use via PRIMARY_AI_PROVIDER env var
+RUN npm install -g \
+    @anthropic-ai/claude-code \
+    chatgpt-cli \
+    @google/generative-ai
+
+# Create directories for docs and workspace
+RUN mkdir -p /app/docs \
+    && mkdir -p /app/workspace \
+    && mkdir -p /app/.config
+
+# Create a helper script that determines which provider to use
+RUN cat > /app/start-ai.sh << 'EOF'
+#!/bin/bash
+
+# Load environment from .env if it exists
+if [ -f /app/.env ]; then
+    export $(cat /app/.env | grep -v '^#' | xargs)
+fi
+
+# Determine which provider to start
+PRIMARY_AI=${PRIMARY_AI_PROVIDER:-anthropic}
+
+echo "Starting AI Provider: $PRIMARY_AI"
+echo ""
+echo "Available commands:"
+echo "  claude          - Start Anthropic Claude Code"
+echo "  chatgpt         - Start OpenAI ChatGPT CLI"
+echo "  google-ai       - Start Google Gemini CLI"
+echo ""
+echo "Type 'exit' to return to this menu"
+echo ""
+echo "Current provider: $PRIMARY_AI"
+echo "Docs location: /app/docs"
+echo ""
+
+# Start interactive bash shell
+/bin/bash
+EOF
+
+chmod +x /app/start-ai.sh
+
+# Create helper script for saving docs
+RUN cat > /app/save-doc.sh << 'EOF'
+#!/bin/bash
+# Helper script to save generated documentation
+
+if [ $# -lt 2 ]; then
+    echo "Usage: save-doc.sh <filename> <content>"
+    echo "Example: save-doc.sh deployment-guide.md 'My deployment guide...'"
+    exit 1
+fi
+
+FILENAME=$1
+CONTENT=$2
+
+# Create docs directory if it doesn't exist
+mkdir -p /app/docs
+
+# Save the file with timestamp
+TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+FILEPATH="/app/docs/${TIMESTAMP}_${FILENAME}"
+
+echo "$CONTENT" > "$FILEPATH"
+
+echo "✓ Documentation saved to: $FILEPATH"
+ls -lh "$FILEPATH"
+EOF
+
+chmod +x /app/save-doc.sh
+
+# Set up git in docs folder for version control
+RUN cd /app/docs && git init && git config user.email "ai@campaign-stack.local" && git config user.name "AI Provider" || true
+
+# Default command: interactive shell
+ENTRYPOINT ["/bin/bash"]
+CMD ["/app/start-ai.sh"]
