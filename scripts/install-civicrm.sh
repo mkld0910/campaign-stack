@@ -192,13 +192,6 @@ echo "  2. Navigate to CiviCRM menu item in sidebar"
 echo "  3. Complete any remaining setup wizard steps"
 echo "  4. Create test contacts/events/donations"
 echo ""
-echo -e "${YELLOW}Really Simple Security Configuration:${NC}"
-echo "  Whitelist the following domains in Really Simple Security:"
-echo "  - ${PUBLIC_DOMAIN}"
-if [ ! -z "$BACKEND_DOMAIN" ] && [ "$BACKEND_DOMAIN" != "$PUBLIC_DOMAIN" ]; then
-    echo "  - ${BACKEND_DOMAIN}"
-fi
-echo ""
 echo -e "${BLUE}Documentation:${NC}"
 echo "  - Troubleshooting: docs/TROUBLESHOOTING.md"
 echo "  - CiviCRM Setup: docs/CIVICRM_SETUP.md"

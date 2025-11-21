@@ -110,11 +110,11 @@ echo "Configure how your site will be accessed:"
 echo ""
 echo "Option 1: Single Domain (default)"
 echo "  Same domain for public site + admin"
-echo "  Example: markcampaign.com"
+echo "  Example: janedoeforcongress.com"
 echo ""
 echo "Option 2: Dual Domain (advanced)"
 echo "  Separate public site + admin backend"
-echo "  Example: Public=markcampaign.com, Admin=cwv.it.com"
+echo "  Example: Public=janedoeforcongress.com, Admin=admin.it.com"
 echo ""
 
 read -p "Use dual domain setup? (y/n, default=n): " -n 1 -r
@@ -142,7 +142,7 @@ if [ "$DUAL_DOMAIN" = true ]; then
     echo "  Public:  $PUBLIC_DOMAIN"
     echo "  Backend: $BACKEND_DOMAIN"
 else
-    read -p "Enter domain name (e.g., markcampaign.com): " DOMAIN
+    read -p "Enter domain name (e.g., janedoeforcongress.com): " DOMAIN
     while [ -z "$DOMAIN" ]; do
         print_error "Domain cannot be empty"
         read -p "Enter domain name: " DOMAIN
