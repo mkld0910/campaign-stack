@@ -94,7 +94,26 @@ case $CHOICE in
     echo "Get your API key from: https://console.anthropic.com/api-keys"
     read -s -p "Enter Anthropic API key (sk-...): " ANTHROPIC_API_KEY
     echo ""
-    
+
+    # Validate API key
+    print_info "Validating API key..."
+    if bash "$SCRIPT_DIR/validate-api-key.sh" anthropic "$ANTHROPIC_API_KEY"; then
+        print_success "Anthropic API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
+
     # Update .env (portable sed)
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' '/^PRIMARY_AI_PROVIDER=/d' .env
@@ -141,7 +160,26 @@ EOF
     echo "Get your API key from: https://platform.openai.com/api-keys"
     read -s -p "Enter OpenAI API key (sk-...): " OPENAI_API_KEY
     echo ""
-    
+
+    # Validate API key
+    print_info "Validating API key..."
+    if bash "$SCRIPT_DIR/validate-api-key.sh" openai "$OPENAI_API_KEY"; then
+        print_success "OpenAI API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
+
     # Update .env (portable sed)
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' '/^PRIMARY_AI_PROVIDER=/d' .env
@@ -188,7 +226,26 @@ EOF
     echo "Get your API key from: https://ai.google.dev/tutorials/setup"
     read -s -p "Enter Google API key: " GOOGLE_API_KEY
     echo ""
-    
+
+    # Validate API key
+    print_info "Validating API key..."
+    if bash "$SCRIPT_DIR/validate-api-key.sh" google "$GOOGLE_API_KEY"; then
+        print_success "Google Gemini API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
+
     # Update .env (portable sed)
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' '/^PRIMARY_AI_PROVIDER=/d' .env
