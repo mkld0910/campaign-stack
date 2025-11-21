@@ -1,0 +1,32 @@
+services:
+  traefik:
+    image: docker.io/library/traefik:v3.6.1
+    container_name: traefik
+    security_opt:
+      - no-new-privileges:true
+    hostname: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/:/etc/traefik/:ro
+      - ./certs/:/var/traefik/certs/:rw
+    env_file:
+      - ./.env
+    environment:
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - traefik
+    restart: unless-stopped
+
+networks:
+  traefik:
+    driver: bridge
+    name: traefik

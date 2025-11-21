@@ -1,8 +1,8 @@
 # version: '3.8'  # Removed: obsolete in Docker Compose V2
 
 # Campaign Stack - Complete Docker Configuration (v2.3)
-# Deploys: Traefik, WordPress, MySQL, Portainer, Wiki.js, AI Provider (optional)
-# AI providers can be installed on HOST or in container
+# Deploys: Traefik, WordPress, MySQL, Portainer, Wiki.js
+# AI providers are installed on HOST by installer, not containerized
 
 services:
 
@@ -200,7 +200,6 @@ services:
   # To use containerized AI instead, run: docker compose --profile ai up -d
   ai_provider:
     profiles: ["ai"]  # Only starts when explicitly enabled with --profile ai
-    image: alpine:3.19  # Lightweight placeholder image
     build:
       context: .
       dockerfile: Dockerfile.ai-provider
