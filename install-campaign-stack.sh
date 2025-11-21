@@ -269,7 +269,13 @@ esac
 print_header "Step 4/7: Setting Up Environment"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
+# If script is in root of repo, REPO_DIR is same as SCRIPT_DIR
+# If script is in scripts/ subdirectory, REPO_DIR is parent
+if [[ "$(basename "$SCRIPT_DIR")" == "scripts" ]]; then
+    REPO_DIR="$(dirname "$SCRIPT_DIR")"
+else
+    REPO_DIR="$SCRIPT_DIR"
+fi
 
 mkdir -p "$REPO_DIR/backups"
 mkdir -p "$REPO_DIR/wordpress_data"
