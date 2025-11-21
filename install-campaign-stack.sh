@@ -370,9 +370,9 @@ if [ "$INSTALL_AI_PROVIDER" = true ]; then
     print_info "AI provider enabled - pulling AI container image..."
     docker compose --profile ai pull
 else
-    # Explicitly pull only core services, excluding ai_provider
+    # Pull core services only (ai_provider has profiles so it's excluded automatically)
     print_info "Pulling core services (excluding AI provider)..."
-    docker compose pull traefik portainer wordpress_mysql wordpress_app wiki_db wiki
+    docker compose pull
 fi
 
 print_info "Starting services..."
