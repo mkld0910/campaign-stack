@@ -17,6 +17,13 @@
 
 set -e
 
+# Platform Detection
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+    echo "Error: This script must run on Linux (Ubuntu/Debian/RHEL/CentOS)"
+    echo "Please run this on your VPS or use WSL on Windows"
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -67,11 +74,19 @@ fi
 # Check and install Docker Compose (v2)
 if ! docker compose version &> /dev/null; then
     print_warning "Docker Compose V2 not found. Attempting install..."
-    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    print_success "Docker Compose installed"
+
+    # Get latest version
+    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep tag_name | cut -d '"' -f 4)
+
+    # Install Docker Compose V2 plugin
+    mkdir -p ~/.docker/cli-plugins/
+    curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" \
+        -o ~/.docker/cli-plugins/docker-compose
+    chmod +x ~/.docker/cli-plugins/docker-compose
+
+    print_success "Docker Compose V2 installed"
 else
-    print_success "Docker Compose already installed: $(docker compose --version)"
+    print_success "Docker Compose already installed: $(docker compose version)"
 fi
 
 # Verify both work
@@ -198,10 +213,10 @@ case $PROVIDER_CHOICE in
     echo "Anthropic Claude selected"
     echo "Get your API key from: https://console.anthropic.com/api-keys"
     echo ""
-    read -s -p "Enter Anthropic API key (sk-...): " ANTHROPIC_API_KEY
+    read -s -p "Enter Anthropic API key (sk-ant-...): " ANTHROPIC_API_KEY
     echo ""
-    if [[ ! $ANTHROPIC_API_KEY =~ ^sk- ]]; then
-        print_warning "API key should start with 'sk-'. Verify in console."
+    if [[ ! $ANTHROPIC_API_KEY =~ ^sk-ant- ]]; then
+        print_warning "Anthropic API keys typically start with 'sk-ant-'. Verify in console."
     fi
     print_success "Anthropic configured"
     ;;
@@ -349,10 +364,10 @@ print_header "Step 5/7: Deploying Docker Services"
 cd "$REPO_DIR"
 
 print_info "Pulling Docker images (this may take a few minutes)..."
-docker-compose pull
+docker compose pull
 
 print_info "Starting services..."
-docker-compose up -d
+docker compose up -d
 
 print_info "Waiting for services to initialize..."
 sleep 30
@@ -364,12 +379,24 @@ if [ "$INSTALL_AI_PROVIDER" = true ]; then
     case $PRIMARY_AI_PROVIDER in
       anthropic)
         print_info "Setting up Anthropic Claude..."
-        
+
         # Check for Node.js
         if ! command -v node &> /dev/null; then
             print_info "Installing Node.js and npm..."
-            apt-get update -qq > /dev/null 2>&1
-            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+
+            # Detect package manager
+            if command -v apt-get &> /dev/null; then
+                apt-get update -qq > /dev/null 2>&1
+                apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            elif command -v yum &> /dev/null; then
+                yum install -y nodejs npm > /dev/null 2>&1
+            elif command -v dnf &> /dev/null; then
+                dnf install -y nodejs npm > /dev/null 2>&1
+            else
+                print_error "Unsupported package manager. Install Node.js manually."
+                exit 1
+            fi
+
             print_success "Node.js installed: $(node --version)"
         fi
         
@@ -381,12 +408,24 @@ if [ "$INSTALL_AI_PROVIDER" = true ]; then
       
       openai)
         print_info "Setting up OpenAI ChatGPT CLI..."
-        
+
         # Check for Node.js
         if ! command -v node &> /dev/null; then
             print_info "Installing Node.js and npm..."
-            apt-get update -qq > /dev/null 2>&1
-            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+
+            # Detect package manager
+            if command -v apt-get &> /dev/null; then
+                apt-get update -qq > /dev/null 2>&1
+                apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            elif command -v yum &> /dev/null; then
+                yum install -y nodejs npm > /dev/null 2>&1
+            elif command -v dnf &> /dev/null; then
+                dnf install -y nodejs npm > /dev/null 2>&1
+            else
+                print_error "Unsupported package manager. Install Node.js manually."
+                exit 1
+            fi
+
             print_success "Node.js installed: $(node --version)"
         fi
         
@@ -398,12 +437,24 @@ if [ "$INSTALL_AI_PROVIDER" = true ]; then
       
       google)
         print_info "Setting up Google Gemini CLI..."
-        
+
         # Check for Node.js
         if ! command -v node &> /dev/null; then
             print_info "Installing Node.js and npm..."
-            apt-get update -qq > /dev/null 2>&1
-            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+
+            # Detect package manager
+            if command -v apt-get &> /dev/null; then
+                apt-get update -qq > /dev/null 2>&1
+                apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            elif command -v yum &> /dev/null; then
+                yum install -y nodejs npm > /dev/null 2>&1
+            elif command -v dnf &> /dev/null; then
+                dnf install -y nodejs npm > /dev/null 2>&1
+            else
+                print_error "Unsupported package manager. Install Node.js manually."
+                exit 1
+            fi
+
             print_success "Node.js installed: $(node --version)"
         fi
         
@@ -443,18 +494,18 @@ fi
 # Verify Deployment
 print_header "Step $VERIFICATION_STEP/$((VERIFICATION_STEP)): Verifying Deployment"
 
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     print_success "Docker services running"
 else
     print_error "Some services failed to start"
-    print_info "Run: docker-compose logs"
-    docker-compose logs
+    print_info "Run: docker compose logs"
+    docker compose logs
     exit 1
 fi
 
 # Count running services
-RUNNING=$(docker-compose ps | grep -c "Up" || true)
-TOTAL=$(docker-compose config --services | wc -l)
+RUNNING=$(docker compose ps | grep -c "Up" || true)
+TOTAL=$(docker compose config --services | wc -l)
 
 if [ "$RUNNING" -ge "$TOTAL" ]; then
     print_success "Traefik proxy running"
@@ -462,7 +513,7 @@ if [ "$RUNNING" -ge "$TOTAL" ]; then
     print_success "MySQL database running"
     print_success "All services verified"
 else
-    print_warning "Some services still starting. Check status: docker-compose ps"
+    print_warning "Some services still starting. Check status: docker compose ps"
 fi
 
 # Final Instructions
