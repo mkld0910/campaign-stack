@@ -85,9 +85,6 @@ services:
   wordpress_app:
     image: wordpress:latest
     container_name: wordpress_app
-    build:
-      context: .
-      dockerfile: Dockerfile.wordpress
     environment:
       # Database connection
       WORDPRESS_DB_HOST: wordpress_mysql
@@ -96,8 +93,8 @@ services:
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       
       # Dual-domain configuration
-      WP_HOME: https://${PUBLIC_DOMAIN:-DOMAIN}
-      WP_SITEURL: https://${BACKEND_DOMAIN:-DOMAIN}
+      WP_HOME: https://${PUBLIC_DOMAIN:-${DOMAIN}}
+      WP_SITEURL: https://${BACKEND_DOMAIN:-${DOMAIN}}
       
     volumes:
       - wordpress_data:/var/www/html
@@ -261,12 +258,9 @@ volumes:
   wiki_data:
   
   # AI-generated documentation (shared between AI container and Wiki.js)
+  # NOTE: On Linux/VPS this will create a named volume managed by Docker
+  # Path will be in /var/lib/docker/volumes/
   docs_volume:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /srv/campaign-stack/docs
 
 
 # ================================================================================
@@ -275,3 +269,4 @@ volumes:
 networks:
   traefik:
     driver: bridge
+
