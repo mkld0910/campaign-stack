@@ -6,10 +6,15 @@
 
 ## Quick Start
 ```bash
-bash install-campaign-stack.sh
+cd /srv
+git clone https://github.com/mkld0910/campaign-stack.git
+cd campaign-stack
+bash scripts/install-campaign-stack.sh
 ```
 
 Answer a few questions, infrastructure is live in 15-30 minutes.
+
+**Prefer a GUI?** See [web-installer/README.md](./web-installer/README.md) for the graphical installer.
 
 ## What's Included
 
@@ -57,7 +62,7 @@ cd campaign-stack
 
 ### 4. Run Installer
 ```bash
-bash install-campaign-stack.sh
+bash scripts/install-campaign-stack.sh
 ```
 
 ### 5. Complete WordPress Setup
@@ -81,6 +86,9 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Common errors & fixes |
 | [docs/BACKUP.md](./docs/BACKUP.md) | Backup configuration |
 | [docs/CIVICRM_SETUP.md](./docs/CIVICRM_SETUP.md) | CiviCRM installation |
+| [web-installer/README.md](./web-installer/README.md) | GUI installer guide |
+| [docs/architecture/](./docs/architecture/) | Architecture & design docs |
+| [CREDITS.md](./CREDITS.md) | Full acknowledgments |
 
 ## Troubleshooting
 
@@ -115,11 +123,46 @@ A: You have automated backups. Restore in 15-30 minutes.
 **Q: Is this secure?**
 A: Yes, HTTPS by default. Passwords never committed to git (.gitignore protects .env).
 
+## Installation Options
+
+### Option 1: Command Line (Recommended for Technical Users)
+```bash
+cd /srv/campaign-stack
+bash scripts/install-campaign-stack.sh
+```
+
+### Option 2: Web-Based GUI (For Everyone Else)
+```bash
+cd /srv/campaign-stack/web-installer
+php -S 0.0.0.0:8888
+```
+Then visit `http://YOUR_VPS_IP:8888` in your browser for a user-friendly installation wizard.
+
+See [web-installer/README.md](./web-installer/README.md) for details.
+
 ## License
 
 MIT License - See [LICENSE](./LICENSE) file
 
-## Credits
+## Credits & Acknowledgments
 
-Built for political campaigns
+Campaign Stack is built on the shoulders of extraordinary open-source projects:
+
+- **WordPress** - CMS powering the website
+- **CiviCRM** - Constituent relationship management
+- **Docker & Docker Compose** - Container infrastructure
+- **Traefik** - Reverse proxy with automatic HTTPS
+- **MySQL** - Database system
+- **Let's Encrypt** - Free SSL/TLS certificates
+- **Storj** - Decentralized backup storage
+- **Christian Lempa** - Docker infrastructure patterns and best practices
+- **Claude AI (Anthropic)** - Development assistance and documentation
+
+Special thanks to all open-source maintainers and the global community of developers building tools for civic engagement.
+
+For the complete list of acknowledgments and how to contribute, see **[CREDITS.md](./CREDITS.md)**
+
+---
+
+Built with ❤️ for political campaigns and civic engagement
 
