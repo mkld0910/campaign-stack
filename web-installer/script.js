@@ -107,7 +107,7 @@ function updateCheckItem(id, result) {
     el.innerHTML = (result.success ? '✓' : '✗') + ' ' + result.message;
 }
 
-function reviewConfig() {
+async function reviewConfig() {
     // Gather configuration
     const form = document.getElementById('config-form');
     const formData = new FormData(form);
@@ -142,26 +142,95 @@ function reviewConfig() {
         config.domain = config.public_domain;
     }
 
-    // Get API keys if needed
+    // Get API keys if needed and validate
     if (config.ai_provider === 'anthropic') {
         config.ai_key = formData.get('anthropic_key');
         if (!config.ai_key) {
             alert('Please enter your Anthropic API key.');
             return;
         }
+        await validateAndProceed('anthropic', config.ai_key);
     } else if (config.ai_provider === 'openai') {
         config.ai_key = formData.get('openai_key');
         if (!config.ai_key) {
             alert('Please enter your OpenAI API key.');
             return;
         }
+        await validateAndProceed('openai', config.ai_key);
     } else if (config.ai_provider === 'google') {
         config.ai_key = formData.get('google_key');
         if (!config.ai_key) {
             alert('Please enter your Google API key.');
             return;
         }
+        await validateAndProceed('google', config.ai_key);
+    } else {
+        displayReview();
     }
+}
+
+async function validateAndProceed(provider, apiKey) {
+    const button = document.getElementById('btn-next-2');
+    button.disabled = true;
+    button.textContent = 'Validating API key...';
+
+    try {
+        const formData = new FormData();
+        formData.append('provider', provider);
+        formData.append('api_key', apiKey);
+
+        const response = await fetch('validate-key.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.valid === true) {
+            displayReview();
+        } else if (result.valid === false) {
+            const proceed = confirm(
+                `API key validation failed: ${result.message}\n\n` +
+                `Do you want to continue anyway? (Not recommended)`
+            );
+            if (proceed) {
+                displayReview();
+            } else {
+                button.disabled = false;
+                button.textContent = 'Review Installation →';
+            }
+        } else {
+            // Network error
+            const proceed = confirm(
+                `Cannot validate API key (network issue).\n\n` +
+                `Do you want to continue anyway?`
+            );
+            if (proceed) {
+                displayReview();
+            } else {
+                button.disabled = false;
+                button.textContent = 'Review Installation →';
+            }
+        }
+    } catch (error) {
+        console.error('Validation error:', error);
+        const proceed = confirm(
+            `Error validating API key: ${error.message}\n\n` +
+            `Do you want to continue anyway?`
+        );
+        if (proceed) {
+            displayReview();
+        } else {
+            button.disabled = false;
+            button.textContent = 'Review Installation →';
+        }
+    }
+}
+
+function displayReview() {
+    const button = document.getElementById('btn-next-2');
+    button.disabled = false;
+    button.textContent = 'Review Installation →';
 
     // Display review
     let reviewHTML = '<div class="review-item"><div class="review-label">Domain Configuration</div>';

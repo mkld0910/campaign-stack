@@ -218,7 +218,26 @@ case $PROVIDER_CHOICE in
     if [[ ! $ANTHROPIC_API_KEY =~ ^sk-ant- ]]; then
         print_warning "Anthropic API keys typically start with 'sk-ant-'. Verify in console."
     fi
-    print_success "Anthropic configured"
+
+    # Validate API key
+    print_info "Validating API key..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if bash "$SCRIPT_DIR/validate-api-key.sh" anthropic "$ANTHROPIC_API_KEY"; then
+        print_success "Anthropic API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Installation cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
     ;;
   2)
     PRIMARY_AI_PROVIDER="openai"
@@ -232,7 +251,26 @@ case $PROVIDER_CHOICE in
     if [[ ! $OPENAI_API_KEY =~ ^sk- ]]; then
         print_warning "API key should start with 'sk-'. Verify in console."
     fi
-    print_success "OpenAI configured"
+
+    # Validate API key
+    print_info "Validating API key..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if bash "$SCRIPT_DIR/validate-api-key.sh" openai "$OPENAI_API_KEY"; then
+        print_success "OpenAI API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Installation cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
     ;;
   3)
     PRIMARY_AI_PROVIDER="google"
@@ -243,7 +281,26 @@ case $PROVIDER_CHOICE in
     echo ""
     read -s -p "Enter Google API key: " GOOGLE_API_KEY
     echo ""
-    print_success "Google Gemini configured"
+
+    # Validate API key
+    print_info "Validating API key..."
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if bash "$SCRIPT_DIR/validate-api-key.sh" google "$GOOGLE_API_KEY"; then
+        print_success "Google Gemini API key validated successfully"
+    else
+        validation_result=$?
+        if [ $validation_result -eq 1 ]; then
+            print_error "API key validation failed"
+            read -p "Continue anyway? (y/n): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                print_info "Installation cancelled"
+                exit 1
+            fi
+        else
+            print_warning "Could not validate key (network issue). Continuing..."
+        fi
+    fi
     ;;
   4)
     PRIMARY_AI_PROVIDER="ollama"
