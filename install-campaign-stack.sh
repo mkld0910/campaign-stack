@@ -1,10 +1,18 @@
 #!/bin/bash
 
 ################################################################################
-# Campaign Stack - One-Command Installer
-# Version: 2.0
-# Purpose: Deploy WordPress + CiviCRM + Traefik with dual-domain support
-# Usage: bash install-campaign-stack.sh
+# Campaign Stack - One-Command Installer (Provider-Agnostic)
+# Version: 2.2 (Multi-AI Provider Support)
+# Purpose: Deploy WordPress + CiviCRM + Traefik + Choice of AI Provider
+# Usage: bash scripts/install-campaign-stack.sh
+# 
+# This script will:
+# - Check for/install Docker and Docker Compose
+# - Prompt for domain and email configuration
+# - Generate secure database passwords
+# - Let user choose preferred AI provider (optional)
+# - Deploy all services
+# - Verify everything is running
 ################################################################################
 
 set -e
@@ -39,9 +47,9 @@ print_info() {
 }
 
 # Main Installation
-print_header "Campaign Stack Installer v2.0"
-echo "Deploy WordPress + CiviCRM + Traefik with Dual-Domain Support"
-echo "Estimated time: 15-30 minutes"
+print_header "Campaign Stack Installer v2.2"
+echo "Deploy WordPress + CiviCRM + Traefik with choice of AI Provider"
+echo "Estimated time: 20-30 minutes (+ 5 min if installing AI CLI)"
 echo ""
 
 # Prerequisites Check & Installation
@@ -53,73 +61,73 @@ if ! command -v docker &> /dev/null; then
     curl -sSL https://get.docker.com | sh
     print_success "Docker installed"
 else
-    print_success "Docker already installed"
+    print_success "Docker already installed: $(docker --version)"
 fi
 
-# Check for Docker Compose (V2 is included with modern Docker)
+# Check and install Docker Compose (v2)
 if ! docker compose version &> /dev/null; then
-    print_error "Docker Compose V2 not found"
-    print_info "Ensure you have Docker Desktop or Docker Engine with Compose plugin"
-    exit 1
+    print_warning "Docker Compose V2 not found. Attempting install..."
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    print_success "Docker Compose installed"
 else
-    print_success "Docker Compose already installed"
+    print_success "Docker Compose already installed: $(docker compose --version)"
 fi
 
-# Verify Docker works
+# Verify both work
 if ! docker --version &> /dev/null; then
-    print_error "Docker installation failed"
+    print_error "Docker not working. Try: sudo systemctl restart docker"
     exit 1
 fi
 
-# Optional: Uplink CLI for backups
-if ! command -v uplink &> /dev/null; then
-    print_warning "Uplink CLI not found. Backups to Storj will not work until installed."
-    print_info "Install after deployment: See docs/BACKUP.md"
-else
-    print_success "Uplink CLI installed"
+if ! docker ps &> /dev/null; then
+    print_warning "Docker access issue. Adding current user to docker group..."
+    sudo usermod -aG docker $USER
+    print_info "Please run: newgrp docker"
+    print_info "Then re-run this installer"
+    exit 1
 fi
 
-# Domain Configuration
-print_header "Step 2/7: Domain Configuration"
-echo "Configure how your campaign stack will be accessed:"
+# Gather User Input
+print_header "Step 2/7: Configure Your Campaign"
+
+echo "Configure how your site will be accessed:"
 echo ""
-echo "Option 1: Single Domain (both public and admin at same address)"
-echo "  Example: example.com"
+echo "Option 1: Single Domain (default)"
+echo "  Same domain for public site + admin"
+echo "  Example: markcampaign.com"
 echo ""
-echo "Option 2: Dual Domain (public frontend, separate backend admin)"
-echo "  Example: Public=example.com, Backend=admin.example.com"
+echo "Option 2: Dual Domain (advanced)"
+echo "  Separate public site + admin backend"
+echo "  Example: Public=markcampaign.com, Admin=cwv.it.com"
 echo ""
 
-read -p "Use dual domain setup? (y/n): " -n 1 -r
+read -p "Use dual domain setup? (y/n, default=n): " -n 1 -r
 echo
 DUAL_DOMAIN=false
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     DUAL_DOMAIN=true
-    print_info "Dual domain mode enabled"
-else
-    print_info "Single domain mode enabled"
 fi
-
-echo ""
 
 if [ "$DUAL_DOMAIN" = true ]; then
     read -p "Enter PUBLIC domain (what visitors see): " PUBLIC_DOMAIN
     while [ -z "$PUBLIC_DOMAIN" ]; do
-        print_error "Public domain cannot be empty"
+        print_error "Domain cannot be empty"
         read -p "Enter PUBLIC domain: " PUBLIC_DOMAIN
     done
     
-    read -p "Enter BACKEND domain (admin/operations): " BACKEND_DOMAIN
+    read -p "Enter BACKEND domain (admin interface): " BACKEND_DOMAIN
     while [ -z "$BACKEND_DOMAIN" ]; do
-        print_error "Backend domain cannot be empty"
+        print_error "Domain cannot be empty"
         read -p "Enter BACKEND domain: " BACKEND_DOMAIN
     done
     
+    DOMAIN=$PUBLIC_DOMAIN
     print_success "Dual domain configured:"
-    echo "  Public:  ${PUBLIC_DOMAIN}"
-    echo "  Backend: ${BACKEND_DOMAIN}"
+    echo "  Public:  $PUBLIC_DOMAIN"
+    echo "  Backend: $BACKEND_DOMAIN"
 else
-    read -p "Enter domain name: " DOMAIN
+    read -p "Enter domain name (e.g., markcampaign.com): " DOMAIN
     while [ -z "$DOMAIN" ]; do
         print_error "Domain cannot be empty"
         read -p "Enter domain name: " DOMAIN
@@ -127,44 +135,141 @@ else
     
     PUBLIC_DOMAIN=$DOMAIN
     BACKEND_DOMAIN=$DOMAIN
-    print_success "Single domain configured: ${DOMAIN}"
+    print_success "Single domain configured: $DOMAIN"
 fi
 
 echo ""
-
-# Email Configuration
-print_header "Step 3/7: Email Configuration"
 
 read -p "Enter contact email (for SSL certificates): " EMAIL
 if [ -z "$EMAIL" ]; then
     print_error "Email cannot be empty"
     exit 1
 fi
+print_success "Email configured: $EMAIL"
 
 print_info "Generating secure passwords..."
 MYSQL_ROOT_PASS=$(openssl rand -base64 12)
 MYSQL_USER_PASS=$(openssl rand -base64 12)
+print_success "Secure passwords generated"
 
-print_success "Configuration complete"
+# AI Provider Selection (Provider-Agnostic)
+print_header "Step 3/7: Choose Your AI Provider (Optional)"
+
+echo "Select your preferred AI provider for terminal coding:"
+echo ""
+echo "1. Anthropic Claude (Default)"
+echo "   - Most capable, good for complex tasks"
+echo "   - Cost: ~$3-15 per 1M tokens"
+echo ""
+echo "2. OpenAI ChatGPT"
+echo "   - Powerful, widely used"
+echo "   - Cost: ~$0.50-60 per 1M tokens"
+echo ""
+echo "3. Google Gemini"
+echo "   - Cost-effective, efficient"
+echo "   - Cost: ~$0.25-0.50 per 1M tokens (CHEAPEST)"
+echo ""
+echo "4. Local Ollama (Free & Offline)"
+echo "   - Run models locally, NO API key needed"
+echo "   - Cost: FREE, works offline"
+echo "   - Models: Mistral, Llama 2, Neural Chat"
+echo ""
+echo "5. Skip AI provider"
+echo "   - Don't install any AI CLI tool"
+echo "   - Can add later anytime"
+echo ""
+
+read -p "Choose provider (1-5, default=5): " -n 1 PROVIDER_CHOICE
+echo
+PROVIDER_CHOICE=${PROVIDER_CHOICE:-5}
+
+PRIMARY_AI_PROVIDER=""
+ANTHROPIC_API_KEY=""
+OPENAI_API_KEY=""
+GOOGLE_API_KEY=""
+OLLAMA_BASE_URL=""
+INSTALL_AI_PROVIDER=false
+
+case $PROVIDER_CHOICE in
+  1)
+    PRIMARY_AI_PROVIDER="anthropic"
+    INSTALL_AI_PROVIDER=true
+    echo ""
+    echo "Anthropic Claude selected"
+    echo "Get your API key from: https://console.anthropic.com/api-keys"
+    echo ""
+    read -s -p "Enter Anthropic API key (sk-...): " ANTHROPIC_API_KEY
+    echo ""
+    if [[ ! $ANTHROPIC_API_KEY =~ ^sk- ]]; then
+        print_warning "API key should start with 'sk-'. Verify in console."
+    fi
+    print_success "Anthropic configured"
+    ;;
+  2)
+    PRIMARY_AI_PROVIDER="openai"
+    INSTALL_AI_PROVIDER=true
+    echo ""
+    echo "OpenAI ChatGPT selected"
+    echo "Get your API key from: https://platform.openai.com/api-keys"
+    echo ""
+    read -s -p "Enter OpenAI API key (sk-...): " OPENAI_API_KEY
+    echo ""
+    if [[ ! $OPENAI_API_KEY =~ ^sk- ]]; then
+        print_warning "API key should start with 'sk-'. Verify in console."
+    fi
+    print_success "OpenAI configured"
+    ;;
+  3)
+    PRIMARY_AI_PROVIDER="google"
+    INSTALL_AI_PROVIDER=true
+    echo ""
+    echo "Google Gemini selected"
+    echo "Get your API key from: https://ai.google.dev/tutorials/setup"
+    echo ""
+    read -s -p "Enter Google API key: " GOOGLE_API_KEY
+    echo ""
+    print_success "Google Gemini configured"
+    ;;
+  4)
+    PRIMARY_AI_PROVIDER="ollama"
+    INSTALL_AI_PROVIDER=true
+    echo ""
+    echo "Local Ollama selected (FREE)"
+    print_info "Ollama will download and run models locally"
+    print_info "First run may take a few minutes to download model"
+    OLLAMA_BASE_URL="http://localhost:11434"
+    print_success "Ollama configured (local only)"
+    ;;
+  5)
+    print_info "Skipping AI provider installation"
+    INSTALL_AI_PROVIDER=false
+    ;;
+  *)
+    print_warning "Invalid choice, skipping AI provider"
+    INSTALL_AI_PROVIDER=false
+    ;;
+esac
 
 # Create Environment File
 print_header "Step 4/7: Setting Up Environment"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-mkdir -p "$SCRIPT_DIR/backups"
-mkdir -p "$SCRIPT_DIR/wordpress_data"
-mkdir -p "$SCRIPT_DIR/mysql_data"
+mkdir -p "$REPO_DIR/backups"
+mkdir -p "$REPO_DIR/wordpress_data"
+mkdir -p "$REPO_DIR/mysql_data"
+mkdir -p "$REPO_DIR/scripts"
 
-# Create .env file with dual-domain support
-cat > "$SCRIPT_DIR/.env" << EOF_ENV
+# Create .env file with provider-agnostic AI configuration
+cat > "$REPO_DIR/.env" << EOF_ENV
 # Campaign Stack Configuration
 # Generated: $(date)
 
 # Domain Configuration
 PUBLIC_DOMAIN=${PUBLIC_DOMAIN}
 BACKEND_DOMAIN=${BACKEND_DOMAIN}
-DUAL_DOMAIN_MODE=${DUAL_DOMAIN}
+DOMAIN=${DOMAIN}
 
 # SSL/TLS Configuration
 LETSENCRYPT_EMAIL=${EMAIL}
@@ -175,11 +280,29 @@ MYSQL_USER=wordpress_user
 MYSQL_PASSWORD=${MYSQL_USER_PASS}
 MYSQL_DATABASE=wordpress_db
 
+# ============================================================================
+# AI PROVIDER CONFIGURATION (Provider-Agnostic)
+# ============================================================================
+# Primary AI provider: anthropic, openai, google, ollama, or none
+PRIMARY_AI_PROVIDER=${PRIMARY_AI_PROVIDER}
+
+# Anthropic Claude API
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+# OpenAI ChatGPT API
+OPENAI_API_KEY=${OPENAI_API_KEY}
+
+# Google Gemini API
+GOOGLE_API_KEY=${GOOGLE_API_KEY}
+
+# Local Ollama (no key needed)
+OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+
 # Backup Configuration
 STORJ_ACCESS_GRANT=
 STORJ_BUCKET=campaign-backups-production
 
-# Campaign Stack Configuration
+# Environment
 ENVIRONMENT=production
 DEBUG=false
 EOF_ENV
@@ -187,7 +310,7 @@ EOF_ENV
 print_success ".env file created"
 
 # Save credentials backup
-cat > "$SCRIPT_DIR/CREDENTIALS_BACKUP.txt" << EOF_CREDS
+cat > "$REPO_DIR/CREDENTIALS_BACKUP.txt" << EOF_CREDS
 === CAMPAIGN STACK CREDENTIALS ===
 Generated: $(date)
 
@@ -198,91 +321,233 @@ Domain Configuration:
 
 Email: ${EMAIL}
 
-MySQL Root Password: ${MYSQL_ROOT_PASS}
-MySQL User: wordpress_user
-MySQL User Password: ${MYSQL_USER_PASS}
+MySQL Credentials:
+  Root Password: ${MYSQL_ROOT_PASS}
+  Database User: wordpress_user
+  User Password: ${MYSQL_USER_PASS}
+  Database Name: wordpress_db
 
-SAVE THIS FILE SECURELY:
-1. Copy contents to password manager (Bitwarden, 1Password, etc.)
-2. Delete this file from server: rm CREDENTIALS_BACKUP.txt
-3. Never commit to git
+AI Provider Configuration:
+  Primary Provider: ${PRIMARY_AI_PROVIDER}
+  (API keys stored in .env)
+
+IMPORTANT - SAVE THIS SECURELY:
+1. Copy ALL credentials to your password manager (Bitwarden, 1Password, etc.)
+2. Delete this file from the server: rm CREDENTIALS_BACKUP.txt
+3. Never commit .env to git or share publicly
+4. Store in secure location for recovery
+
+Credentials will be loaded from .env for future use.
 EOF_CREDS
 
 print_warning "Credentials saved to CREDENTIALS_BACKUP.txt"
-print_warning "IMPORTANT: Save to password manager, then delete file"
+print_warning "IMPORTANT: Save these to password manager, then delete file"
 
 # Deploy Services
-print_header "Step 5/7: Deploying Services"
+print_header "Step 5/7: Deploying Docker Services"
 
-cd "$SCRIPT_DIR"
+cd "$REPO_DIR"
 
-print_info "Pulling Docker images..."
-docker compose pull
+print_info "Pulling Docker images (this may take a few minutes)..."
+docker-compose pull
 
 print_info "Starting services..."
-docker compose up -d
+docker-compose up -d
 
 print_info "Waiting for services to initialize..."
 sleep 30
 
-# Verify Deployment
-print_header "Step 6/7: Verifying Deployment"
+# AI Provider Installation (if enabled)
+if [ "$INSTALL_AI_PROVIDER" = true ]; then
+    print_header "Step 6/7: Setting Up AI Provider"
+    
+    case $PRIMARY_AI_PROVIDER in
+      anthropic)
+        print_info "Setting up Anthropic Claude..."
+        
+        # Check for Node.js
+        if ! command -v node &> /dev/null; then
+            print_info "Installing Node.js and npm..."
+            apt-get update -qq > /dev/null 2>&1
+            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            print_success "Node.js installed: $(node --version)"
+        fi
+        
+        print_info "Installing Claude Code CLI..."
+        npm install -g @anthropic-ai/claude-code > /dev/null 2>&1
+        print_success "Claude Code CLI installed"
+        print_info "Usage: claude"
+        ;;
+      
+      openai)
+        print_info "Setting up OpenAI ChatGPT CLI..."
+        
+        # Check for Node.js
+        if ! command -v node &> /dev/null; then
+            print_info "Installing Node.js and npm..."
+            apt-get update -qq > /dev/null 2>&1
+            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            print_success "Node.js installed: $(node --version)"
+        fi
+        
+        print_info "Installing ChatGPT CLI..."
+        npm install -g chatgpt-cli > /dev/null 2>&1
+        print_success "ChatGPT CLI installed"
+        print_info "Usage: chatgpt"
+        ;;
+      
+      google)
+        print_info "Setting up Google Gemini CLI..."
+        
+        # Check for Node.js
+        if ! command -v node &> /dev/null; then
+            print_info "Installing Node.js and npm..."
+            apt-get update -qq > /dev/null 2>&1
+            apt-get install -y -qq nodejs npm > /dev/null 2>&1
+            print_success "Node.js installed: $(node --version)"
+        fi
+        
+        print_info "Installing Google Gemini CLI..."
+        npm install -g @google/generative-ai > /dev/null 2>&1
+        print_success "Google Gemini CLI installed"
+        print_info "Usage: google-ai (or similar command)"
+        ;;
+      
+      ollama)
+        print_info "Setting up Local Ollama..."
+        
+        if command -v ollama &> /dev/null; then
+            print_success "Ollama already installed"
+        else
+            print_info "Installing Ollama..."
+            curl -fsSL https://ollama.ai/install.sh | sh > /dev/null 2>&1
+            print_success "Ollama installed"
+        fi
+        
+        print_info "Starting Ollama service..."
+        ollama serve > /dev/null 2>&1 &
+        sleep 5
+        
+        print_info "Pulling Mistral model (may take a few minutes)..."
+        ollama pull mistral > /dev/null 2>&1
+        print_success "Mistral model ready"
+        print_info "Usage: ollama run mistral"
+        ;;
+    esac
+    
+    VERIFICATION_STEP=7
+else
+    VERIFICATION_STEP=6
+fi
 
-if docker compose ps | grep -q "Up"; then
+# Verify Deployment
+print_header "Step $VERIFICATION_STEP/$((VERIFICATION_STEP)): Verifying Deployment"
+
+if docker-compose ps | grep -q "Up"; then
     print_success "Docker services running"
 else
     print_error "Some services failed to start"
-    docker compose logs
+    print_info "Run: docker-compose logs"
+    docker-compose logs
     exit 1
 fi
 
 # Count running services
-RUNNING=$(docker compose ps | grep -c "Up" || true)
-TOTAL=$(docker compose config --services | wc -l)
+RUNNING=$(docker-compose ps | grep -c "Up" || true)
+TOTAL=$(docker-compose config --services | wc -l)
 
 if [ "$RUNNING" -ge "$TOTAL" ]; then
+    print_success "Traefik proxy running"
     print_success "WordPress container running"
-    print_success "MySQL container running"
-    print_success "All services verified running"
+    print_success "MySQL database running"
+    print_success "All services verified"
 else
-    print_warning "Some services may still be starting. Check with: docker-compose ps"
+    print_warning "Some services still starting. Check status: docker-compose ps"
 fi
 
 # Final Instructions
-print_header "Step 7/7: Setup Complete!"
+print_header "Setup Complete!"
 
 echo "Your campaign infrastructure is now live!"
 echo ""
 echo -e "${GREEN}Access Points:${NC}"
 if [ "$DUAL_DOMAIN" = true ]; then
-    echo "  Public Site: https://$PUBLIC_DOMAIN"
-    echo "  WordPress Admin: https://$BACKEND_DOMAIN/wp-admin"
+    echo "  Public Site: https://${PUBLIC_DOMAIN}"
+    echo "  WordPress Admin: https://${BACKEND_DOMAIN}/wp-admin"
 else
-    echo "  Website: https://$PUBLIC_DOMAIN"
-    echo "  WordPress Admin: https://$PUBLIC_DOMAIN/wp-admin"
+    echo "  Website: https://${DOMAIN}"
+    echo "  WordPress Admin: https://${DOMAIN}/wp-admin"
 fi
+echo "  Portainer (containers): http://${HOSTNAME}:9000 (or your VPS IP:9000)"
+
+if [ "$INSTALL_AI_PROVIDER" = true ]; then
+    echo "  AI Provider: $PRIMARY_AI_PROVIDER (Ready to use)"
+fi
+
 echo ""
 echo -e "${GREEN}Next Steps:${NC}"
-echo "  1. Wait 1-2 minutes for SSL certificate (Let's Encrypt)"
-echo "  2. Visit the site URL to complete WordPress setup"
-echo "  3. Run CiviCRM installer: bash scripts/install-civicrm.sh"
-echo "  4. Configure Really Simple Security to whitelist both domains"
-echo "  5. Configure Storj backups (see docs/BACKUP.md)"
+echo "  1. ✓ Infrastructure deployed"
+echo "  2. → Wait 1-2 minutes for SSL certificate (Let's Encrypt)"
+echo "  3. → Visit your site to verify it's working"
+echo "  4. → Run CiviCRM installer: bash scripts/install-civicrm.sh"
+echo "  5. → Complete WordPress setup (see CONFIGURATION.md)"
+echo "  6. → Configure email (see docs/03-CONFIGURATION.md)"
+echo "  7. → Setup backups (see docs/09-BACKUP.md)"
+
+if [ "$INSTALL_AI_PROVIDER" = true ]; then
+    echo ""
+    echo -e "${GREEN}AI Provider Setup:${NC}"
+    case $PRIMARY_AI_PROVIDER in
+      anthropic)
+        echo "  Provider: Anthropic Claude"
+        echo "  Usage: claude"
+        echo "  Commands: /help, /status, /model, /clear"
+        ;;
+      openai)
+        echo "  Provider: OpenAI ChatGPT"
+        echo "  Usage: chatgpt"
+        echo "  Commands: Type 'help' for options"
+        ;;
+      google)
+        echo "  Provider: Google Gemini"
+        echo "  Usage: google-ai"
+        echo "  Cost: Cheapest option ($0.25-0.50 per 1M tokens)"
+        ;;
+      ollama)
+        echo "  Provider: Local Ollama (FREE)"
+        echo "  Usage: ollama run mistral"
+        echo "  Cost: Completely FREE, works offline"
+        echo "  Available models: mistral, neural-chat, llama2, etc."
+        ;;
+    esac
+fi
+
 echo ""
-echo -e "${YELLOW}Important:${NC}"
-echo "  - Save credentials to password manager"
-echo "  - Delete CREDENTIALS_BACKUP.txt from server"
-echo "  - Never commit .env to git"
+echo -e "${YELLOW}IMPORTANT:${NC}"
+echo "  ✓ Save CREDENTIALS_BACKUP.txt contents to password manager NOW"
+echo "  ✓ Then delete file: rm CREDENTIALS_BACKUP.txt"
+echo "  ✓ Never commit .env to git"
 if [ "$DUAL_DOMAIN" = true ]; then
-    echo "  - Whitelist both $PUBLIC_DOMAIN and $BACKEND_DOMAIN in security plugins"
+    echo "  ✓ Whitelist both domains in security plugins"
 fi
 echo ""
 echo -e "${BLUE}Documentation:${NC}"
-echo "  - Quick Start: README.md"
-echo "  - Setup Guide: docs/SETUP.md"
-echo "  - Dual Domain: docs/DUAL_DOMAIN_SETUP.md"
-echo "  - Troubleshooting: docs/TROUBLESHOOTING.md"
-echo "  - Backups: docs/BACKUP.md"
+echo "  Quick Start:        docs/01-QUICKSTART.md"
+echo "  Installation:       docs/02-INSTALLATION.md"
+echo "  Configuration:      docs/03-CONFIGURATION.md"
+echo "  Troubleshooting:    docs/04-TROUBLESHOOTING.md"
+echo "  Architecture:       docs/06-ARCHITECTURE.md"
+echo "  Operations:         docs/08-OPERATIONS.md"
+echo "  AI Providers:       docs/13-AI-PROVIDERS.md"
 echo ""
 
 print_success "Deployment completed successfully!"
+echo ""
+print_info "SSL certificate generation can take 2-5 minutes..."
+print_info "Your site will be available once certificate is ready"
+
+if [ "$INSTALL_AI_PROVIDER" = true ]; then
+    echo ""
+    print_info "AI Provider: $PRIMARY_AI_PROVIDER is ready to use"
+    echo "To switch providers later, run: bash scripts/install-ai-provider.sh"
+fi
