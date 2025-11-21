@@ -18,11 +18,21 @@ Answer a few questions, infrastructure is live in 15-30 minutes.
 
 ## What's Included
 
+### Core Stack
 - **WordPress** - Campaign website, blog, volunteer forms
 - **CiviCRM** - Donor/volunteer/event management
 - **Traefik** - Automatic HTTPS (Let's Encrypt), reverse proxy
 - **MySQL** - Database
+- **Wiki.js** - Knowledge management and documentation
 - **Automated Backups** - Daily to Storj cloud ($0/month)
+
+### Optional Modules
+- **ACBC Voter Intelligence** - Advanced voter analytics and personalization
+  - LimeSurvey for ACBC surveys
+  - Voter segmentation and profiling
+  - Personalized content delivery
+  - Real-time analytics dashboard
+  - Install with: `bash scripts/install-acbc-module.sh`
 
 ## Cost
 
@@ -87,6 +97,7 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | [docs/BACKUP.md](./docs/BACKUP.md) | Backup configuration |
 | [docs/CIVICRM_SETUP.md](./docs/CIVICRM_SETUP.md) | CiviCRM installation |
 | [web-installer/README.md](./web-installer/README.md) | GUI installer guide |
+| [acbc-module/docs/README.md](./acbc-module/docs/README.md) | ACBC Voter Intelligence Module |
 | [docs/architecture/](./docs/architecture/) | Architecture & design docs |
 | [CREDITS.md](./CREDITS.md) | Full acknowledgments |
 
