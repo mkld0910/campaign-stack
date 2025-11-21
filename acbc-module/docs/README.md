@@ -60,11 +60,23 @@ docker compose -f compose.yaml -f compose-acbc.yaml ps
 
 ## Access Points
 
-After installation:
+After installation, access points depend on your domain configuration:
+
+### Single Domain Configuration
+If you configured a single domain during installation:
 
 - **LimeSurvey Admin**: `https://survey.yourdomain.com/admin`
 - **ACBC Dashboard**: `https://acbc.yourdomain.com`
 - **Analytics API**: `https://acbc-api.yourdomain.com`
+
+### Dual Domain Configuration
+If you configured separate public and backend domains (recommended for security):
+
+- **LimeSurvey Admin**: `https://survey.admin.yourdomain.com/admin`
+- **ACBC Dashboard**: `https://acbc.admin.yourdomain.com`
+- **Analytics API**: `https://acbc-api.admin.yourdomain.com`
+
+All ACBC administrative interfaces use the backend domain to keep them separate from public-facing campaign sites.
 
 ## Configuration
 

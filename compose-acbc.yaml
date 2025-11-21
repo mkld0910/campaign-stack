@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.limesurvey.rule=Host(`survey.${DOMAIN}`)"
+      - "traefik.http.routers.limesurvey.rule=Host(`survey.${BACKEND_DOMAIN:-${DOMAIN}}`)"
       - "traefik.http.routers.limesurvey.entrypoints=web,websecure"
       - "traefik.http.routers.limesurvey.tls=true"
       - "traefik.http.routers.limesurvey.tls.certresolver=letsencrypt"
@@ -94,7 +94,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.acbc-api.rule=Host(`acbc-api.${DOMAIN}`)"
+      - "traefik.http.routers.acbc-api.rule=Host(`acbc-api.${BACKEND_DOMAIN:-${DOMAIN}}`)"
       - "traefik.http.routers.acbc-api.entrypoints=web,websecure"
       - "traefik.http.routers.acbc-api.tls=true"
       - "traefik.http.routers.acbc-api.tls.certresolver=letsencrypt"
@@ -118,7 +118,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.acbc-dashboard.rule=Host(`acbc.${DOMAIN}`)"
+      - "traefik.http.routers.acbc-dashboard.rule=Host(`acbc.${BACKEND_DOMAIN:-${DOMAIN}}`)"
       - "traefik.http.routers.acbc-dashboard.entrypoints=web,websecure"
       - "traefik.http.routers.acbc-dashboard.tls=true"
       - "traefik.http.routers.acbc-dashboard.tls.certresolver=letsencrypt"

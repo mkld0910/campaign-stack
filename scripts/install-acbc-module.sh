@@ -114,16 +114,22 @@ EOF
     print_success "ACBC configuration added to .env"
 
     # Save credentials
+    # Determine admin domain for credentials file
+    CRED_DOMAIN=$(grep ^BACKEND_DOMAIN .env | cut -d '=' -f2)
+    if [ -z "$CRED_DOMAIN" ]; then
+        CRED_DOMAIN="$DOMAIN"
+    fi
+
     cat >> CREDENTIALS_BACKUP.txt << EOF
 
 === ACBC MODULE CREDENTIALS ===
 LimeSurvey Admin:
-  URL: https://survey.${DOMAIN}/admin
+  URL: https://survey.${CRED_DOMAIN}/admin
   Username: admin
   Password: ${LIMESURVEY_ADMIN_PASS}
 
 ACBC Dashboard:
-  URL: https://acbc.${DOMAIN}
+  URL: https://acbc.${CRED_DOMAIN}
   (Uses WordPress/CiviCRM authentication)
 
 Database Passwords:
@@ -346,13 +352,23 @@ print_info "See: acbc-module/docs/CIVICRM_INTEGRATION.md"
 print_header "Step 8/8: Installation Complete!"
 
 DOMAIN=$(grep ^DOMAIN .env | cut -d '=' -f2 || echo "yourdomain.com")
+BACKEND_DOMAIN=$(grep ^BACKEND_DOMAIN .env | cut -d '=' -f2)
+
+# Use BACKEND_DOMAIN for admin interfaces if configured, otherwise fall back to DOMAIN
+if [ -n "$BACKEND_DOMAIN" ]; then
+    ADMIN_DOMAIN="$BACKEND_DOMAIN"
+    print_info "Dual domain configuration detected: Admin on ${BACKEND_DOMAIN}"
+else
+    ADMIN_DOMAIN="$DOMAIN"
+    print_info "Single domain configuration: All services on ${DOMAIN}"
+fi
 
 echo -e "${GREEN}ACBC Voter Intelligence Module is now installed!${NC}"
 echo ""
 echo -e "${GREEN}Access Points:${NC}"
-echo "  LimeSurvey Admin: https://survey.${DOMAIN}/admin"
-echo "  ACBC Dashboard: https://acbc.${DOMAIN}"
-echo "  Analytics API: https://acbc-api.${DOMAIN}"
+echo "  LimeSurvey Admin: https://survey.${ADMIN_DOMAIN}/admin"
+echo "  ACBC Dashboard: https://acbc.${ADMIN_DOMAIN}"
+echo "  Analytics API: https://acbc-api.${ADMIN_DOMAIN}"
 echo ""
 echo -e "${GREEN}Next Steps:${NC}"
 echo "  1. Log into LimeSurvey admin (credentials in CREDENTIALS_BACKUP.txt)"
