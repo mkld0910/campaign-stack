@@ -152,6 +152,7 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | [docs/CIVICRM_SETUP.md](./docs/CIVICRM_SETUP.md) | CiviCRM installation |
 | [web-installer/README.md](./web-installer/README.md) | GUI installer guide |
 | [BRANCHING_STRATEGY.md](./BRANCHING_STRATEGY.md) | Git workflow & contribution guide |
+| [CHANGELOG.md](./CHANGELOG.md) | Version history & release notes |
 | [docs/architecture/](./docs/architecture/) | Architecture & design docs |
 | [CREDITS.md](./CREDITS.md) | Full acknowledgments |
 
