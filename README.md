@@ -16,6 +16,70 @@ Answer a few questions, infrastructure is live in 15-30 minutes.
 
 **Prefer a GUI?** See [web-installer/README.md](./web-installer/README.md) for the graphical installer.
 
+## Branch Structure
+
+Campaign Stack uses multiple branches for stability and development:
+
+### 🟢 master (Stable - Production Ready)
+**Current Version:** v2.3.0
+**Status:** ✅ Tested and stable
+**Use for:** Production campaign deployments
+
+```bash
+git clone https://github.com/mkld0910/campaign-stack.git
+cd campaign-stack
+# Master is default branch
+bash scripts/install-campaign-stack.sh
+```
+
+**Includes:**
+- Core stack (WordPress, CiviCRM, Traefik, MySQL, Wiki.js)
+- Web-based GUI installer
+- Automated backups to Storj
+- Dual domain support
+- API key validation
+
+### 🟡 beta (Beta Testing)
+**Current Version:** v2.4.0-beta.1
+**Status:** ⚠️ Beta - needs testing
+**Use for:** Early adopters, beta testers
+
+```bash
+git clone https://github.com/mkld0910/campaign-stack.git
+cd campaign-stack
+git checkout beta
+bash scripts/install-campaign-stack.sh
+bash scripts/install-acbc-module.sh
+bash scripts/install-chatbot-module.sh
+```
+
+**Additional Features:**
+- ACBC Voter Intelligence Module (Phase 1)
+- AI Policy Chatbot Module (Phase 1)
+
+**⚠️ Warning:** These modules are untested in production. Use at your own risk.
+
+### 🔵 develop (Development)
+**Status:** 🚧 Active development
+**Use for:** Contributors, developers
+
+```bash
+git clone https://github.com/mkld0910/campaign-stack.git
+cd campaign-stack
+git checkout develop
+```
+
+**For developers:** See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for contribution guidelines.
+
+---
+
+**Not sure which branch to use?**
+- **Production campaign → master**
+- **Want to test new features → beta**
+- **Contributing code → develop**
+
+See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for complete documentation.
+
 ## What's Included
 
 - **WordPress** - Campaign website, blog, volunteer forms
@@ -87,6 +151,7 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | [docs/BACKUP.md](./docs/BACKUP.md) | Backup configuration |
 | [docs/CIVICRM_SETUP.md](./docs/CIVICRM_SETUP.md) | CiviCRM installation |
 | [web-installer/README.md](./web-installer/README.md) | GUI installer guide |
+| [BRANCHING_STRATEGY.md](./BRANCHING_STRATEGY.md) | Git workflow & contribution guide |
 | [docs/architecture/](./docs/architecture/) | Architecture & design docs |
 | [CREDITS.md](./CREDITS.md) | Full acknowledgments |
 
@@ -108,6 +173,56 @@ See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) for detailed help.
 3. Deploy!
 
 Send your fork URL to your team - they can deploy in 30 minutes.
+
+## Beta Testing & Roadmap
+
+### Current Beta: v2.4.0-beta.1
+
+We're testing exciting new features on the **beta** branch:
+
+**ACBC Voter Intelligence Module**
+- Advanced voter segmentation via adaptive conjoint surveys
+- LimeSurvey integration for data collection
+- Personalized content delivery based on voter preferences
+- Real-time analytics dashboard
+
+**AI Policy Chatbot Module**
+- Multi-backend AI routing (local Ollama + cloud APIs)
+- Wiki.js integration for policy content
+- Adaptive explanations based on voter sophistication
+- Misconception tracking and campaign intelligence
+- Privacy-first with GDPR/CCPA compliance
+
+### How to Help Beta Test
+
+1. **Deploy on test VPS** (not production):
+   ```bash
+   git clone https://github.com/mkld0910/campaign-stack.git
+   cd campaign-stack
+   git checkout beta
+   bash scripts/install-campaign-stack.sh
+   bash scripts/install-acbc-module.sh
+   bash scripts/install-chatbot-module.sh
+   ```
+
+2. **Test features** and report issues:
+   - Create GitHub issue with `beta` label
+   - Include logs and reproduction steps
+   - Describe expected vs actual behavior
+
+3. **Provide feedback**:
+   - What works well?
+   - What's confusing?
+   - What's missing?
+
+### Release Timeline
+
+- **v2.3.0** (Current - Stable) - Production ready
+- **v2.4.0-beta.1** (Testing) - 2-4 weeks of beta testing
+- **v2.4.0** (Planned) - After successful beta testing
+- **v2.5.0** (Future) - ACBC Phase 2, Enhanced AI routing, Mautic integration
+
+See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for detailed release process.
 
 ## FAQ
 
