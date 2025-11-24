@@ -151,6 +151,7 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | [docs/BACKUP.md](./docs/BACKUP.md) | Backup configuration |
 | [docs/CIVICRM_SETUP.md](./docs/CIVICRM_SETUP.md) | CiviCRM installation |
 | [web-installer/README.md](./web-installer/README.md) | GUI installer guide |
+| [TESTING_GUIDE.md](./TESTING_GUIDE.md) | Beta testing instructions |
 | [BRANCHING_STRATEGY.md](./BRANCHING_STRATEGY.md) | Git workflow & contribution guide |
 | [CHANGELOG.md](./CHANGELOG.md) | Version history & release notes |
 | [docs/architecture/](./docs/architecture/) | Architecture & design docs |
@@ -196,25 +197,30 @@ We're testing exciting new features on the **beta** branch:
 
 ### How to Help Beta Test
 
-1. **Deploy on test VPS** (not production):
-   ```bash
-   git clone https://github.com/mkld0910/campaign-stack.git
-   cd campaign-stack
-   git checkout beta
-   bash scripts/install-campaign-stack.sh
-   bash scripts/install-acbc-module.sh
-   bash scripts/install-chatbot-module.sh
-   ```
+**⚠️ Important:** Use a separate test VPS, never test on production!
 
-2. **Test features** and report issues:
-   - Create GitHub issue with `beta` label
-   - Include logs and reproduction steps
-   - Describe expected vs actual behavior
+**Quick Start:**
+```bash
+# On a FRESH test VPS
+git clone https://github.com/mkld0910/campaign-stack.git
+cd campaign-stack
+git checkout beta
+bash scripts/install-campaign-stack.sh
+bash scripts/install-acbc-module.sh
+bash scripts/install-chatbot-module.sh
+```
 
-3. **Provide feedback**:
-   - What works well?
-   - What's confusing?
-   - What's missing?
+**Complete Testing Guide:** See [TESTING_GUIDE.md](TESTING_GUIDE.md) for:
+- Step-by-step testing instructions
+- How to verify each feature works
+- Database inspection commands
+- Troubleshooting common issues
+- How to report bugs effectively
+
+**Report Issues:**
+- Create GitHub issue with `beta` label
+- Include logs and reproduction steps
+- See TESTING_GUIDE.md for issue template
 
 ### Release Timeline
 
