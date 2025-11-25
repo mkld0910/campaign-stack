@@ -97,9 +97,17 @@ See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for complete documentation.
 
 ## Requirements
 
+**Minimum (Core Stack Only):**
 - VPS with Ubuntu 22.04 or 24.04 LTS
-- 2+ CPU cores, 4GB+ RAM, 80GB+ SSD
+- 2 vCPU, 4GB RAM, 80GB SSD
 - Domain name pointing to VPS IP
+- Cost: ~$12-24/month
+
+**Recommended (Full Stack with Beta Modules):**
+- 6-8 vCPU, 16GB RAM, 240GB SSD
+- Cost: ~$29-80/month (see VPS shopping guide)
+
+📊 **Detailed specs & Black Friday deals:** [VPS_REQUIREMENTS.md](VPS_REQUIREMENTS.md)
 
 ## Installation
 
@@ -146,6 +154,7 @@ See [docs/BACKUP.md](./docs/BACKUP.md)
 | Guide | Purpose |
 |-------|---------|
 | [README.md](./README.md) | Quick start |
+| [VPS_REQUIREMENTS.md](./VPS_REQUIREMENTS.md) | VPS specs & Black Friday shopping guide |
 | [docs/SETUP.md](./docs/SETUP.md) | Detailed walkthrough |
 | [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Common errors & fixes |
 | [docs/BACKUP.md](./docs/BACKUP.md) | Backup configuration |
